@@ -62,9 +62,11 @@ implementado hoje, porque as duas coisas não coincidem.
 ### Fluxo alvo
 
 ```
+No contexto real:
 Medidor / Inversor GoodWe  ──RS485 · Modbus──▶  Nuvem SEMS
                                                     │ API
                                                     ▼
+Na nossa solução simulada:
 ESP32 ──HTTPS──▶  Supabase (PostgreSQL · Auth · Realtime · Edge Functions)  ──Realtime──▶  App
                         ▲
                         └── Motor de inteligência: tarifação dinâmica, DLM, load shifting
