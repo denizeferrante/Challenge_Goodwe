@@ -123,7 +123,7 @@ Roteiro de teste sugerido (aparece na própria tela):
 
 ---
 
-## Decisões técnicas e por quê
+## Decisões técnicas e porquê
 
 **Supabase como fonte única de verdade, não como "um banco".**
 ESP32, motor de inteligência e app escrevem e leem só do Supabase. O firmware não
