@@ -1,6 +1,34 @@
 const BRL = (n) => 'R$ ' + n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const KW = 6.8;
 
+// ---- ponte com a demonstração física (ESP32 + fita WS2812B + botão) ----
+// Mesmo contrato HTTP da v1 (demo-fisica): GET /led?r&g&b&mode e GET /button —
+// então o firmware que já está gravado no ESP32 serve sem alteração.
+// Cores seguem o contrato do design system (cor de status = cor do LED):
+// azul disponível · verde carregando (girando) · vermelho falha.
+// Sem o ESP32 ao alcance, toda chamada falha em silêncio e o app segue normal.
+// O carregador pode estar em dois lugares: na rede que ele mesmo cria
+// (GoodWe-Demo) ou dentro da rede local da apresentação (modo duplo do
+// firmware, com IP fixo). O app testa os dois e usa o que responder.
+const HW_URLS = ['http://192.168.4.1', 'http://192.168.15.222'];
+const HW_LED = {
+  disponivel:  { r: 0, g: 0, b: 255, mode: 0 },   // azul parado
+  conectado:   { r: 255, g: 160, b: 0, mode: 1 }, // âmbar respirando (plugue no carro, aguardando liberar)
+  carregando:  { r: 0, g: 255, b: 0, mode: 2 },   // verde girando pelo W
+  interrompido:{ r: 255, g: 0, b: 0, mode: 1 },   // vermelho respirando (plugue solto no meio da carga)
+  falha:       { r: 255, g: 0, b: 0, mode: 1 },   // vermelho respirando
+  desligado:   { r: 0, g: 0, b: 0, mode: 0 },     // apagado (vaga desativada pelo gestor)
+};
+
+// estado de fábrica das vagas — o reset geral da demo (aperto longo no botão)
+// devolve a lista a este ponto, incluindo a Vaga 03 em falha para demonstrar
+const CHARGERS_INICIAIS = [
+  { id: 'c1', site: 'pn', nome: 'Vaga 01', evse: 'PN-EVSE-01', serie: 'GWH7-2841-BR', conector: 'Tipo 2 · 7 kW', status: 'carregando', kw: 6.8, min: 34, preco: 2.19, hoje: 12.4, total: 4812 },
+  { id: 'c2', site: 'pn', nome: 'Vaga 02', evse: 'PN-EVSE-02', serie: 'GWH7-2847-BR', conector: 'Tipo 2 · 7 kW', status: 'carregando', kw: 6.5, min: 52, preco: 2.19, hoje: 6.6, total: 3964 },
+  { id: 'c3', site: 'pn', nome: 'Vaga 03', evse: 'PN-EVSE-03', serie: 'GWH7-2853-BR', conector: 'Tipo 2 · 7 kW', status: 'falha', erro: 'Erro 2091 · sem resposta Modbus há 12 min', preco: 2.19, hoje: 0, total: 2107 },
+  { id: 'c4', site: 'pn', nome: 'Vaga 04', evse: 'PN-EVSE-04', serie: 'GWH7-2860-BR', conector: 'Tipo 2 · 7 kW', status: 'livre', preco: 2.19, hoje: 3.1, total: 1268 },
+];
+
 const QR_CELLS = (() => {
   const N = 25, cells = [];
   let seed = 20260912;
@@ -38,7 +66,7 @@ class Component extends DCLogic {
     anfChargers: [{ id: 'a1', nome: 'Garagem · HCA G2', sub: 'GoodWe HCA G2 7 kW · uso privado', pub: true }],
     spotId: 's1', fav: ['s1'], mapFilter: 'Todos', histFilter: 'Todos',
     goal: 80, pctIni: 41, method: 'pix', modo: null, metaKm: 120, metaMin: 45, metaKwhDireto: 20,
-    sess: null, running: false, receipt: null, stars: 0,
+    sess: null, running: false, interrupted: false, plugged: false, hwOnline: false, receipt: null, stars: 0,
     saldo: 48.2,
     base: 2.10, solar: 'alto', ponta: false,
     kwp: 96, reserva: 30,
@@ -46,15 +74,92 @@ class Component extends DCLogic {
     sites: [
       { id: 'pn', nome: 'Galeria Pátio Norte', endereco: 'Av. Paulista, 1578 · Bela Vista, SP', kwp: '67,2 kWp instalados' },
     ],
-    chargers: [
-      { id: 'c1', site: 'pn', nome: 'Vaga 01', evse: 'PN-EVSE-01', serie: 'GWH7-2841-BR', conector: 'Tipo 2 · 7 kW', status: 'carregando', kw: 6.8, min: 34, preco: 2.19, hoje: 12.4, total: 4812 },
-      { id: 'c2', site: 'pn', nome: 'Vaga 02', evse: 'PN-EVSE-02', serie: 'GWH7-2847-BR', conector: 'Tipo 2 · 7 kW', status: 'carregando', kw: 6.5, min: 52, preco: 2.19, hoje: 6.6, total: 3964 },
-      { id: 'c3', site: 'pn', nome: 'Vaga 03', evse: 'PN-EVSE-03', serie: 'GWH7-2853-BR', conector: 'Tipo 2 · 7 kW', status: 'falha', erro: 'Erro 2091 · sem resposta Modbus há 12 min', preco: 2.19, hoje: 0, total: 2107 },
-    ],
+    chargers: CHARGERS_INICIAIS.map(c => ({ ...c })),
     chat: [],
+    // previsão (machine learning) — tela Previsão do gestor
+    prevModo: 'dia', prevAlvo: 'galeria', prevGraf: 'fonte', prevShiftProg: {}, prevDia: 0, prevTemp: 0, prevVagasSim: null, prevOrigem: 'dash',
   };
 
-  componentWillUnmount() { clearInterval(this._iv); clearTimeout(this._t); }
+  componentWillUnmount() { clearInterval(this._iv); clearTimeout(this._t); clearInterval(this._hwIv); }
+
+  // ---- demonstração física: LED + botão do carregador impresso ----
+  componentDidMount() {
+    this._hwIv = setInterval(this.hwPoll, 400);
+    this.hwFind();
+  }
+
+  _hwUrl = null;   // endereço onde o carregador de fato respondeu
+  _hwMiss = 0;
+  _hwLast = null;
+
+  // testa os endereços possíveis em paralelo; o primeiro que responder vira o oficial
+  hwFind = () => {
+    if (this.props.hardwareFisico === false) return;
+    HW_URLS.forEach(u => {
+      const opts = (typeof AbortSignal !== 'undefined' && AbortSignal.timeout) ? { signal: AbortSignal.timeout(2500) } : {};
+      fetch(u + '/state', opts)
+        .then(r => {
+          if (r.ok && !this._hwUrl) {
+            this._hwUrl = u;
+            this._hwLast = null;
+            this.setState({ hwOnline: true });   // com o carregador na mesa, o plugue passa a ser exigido
+            this.hwSet('disponivel');
+          }
+        })
+        .catch(() => {});
+    });
+  };
+
+  hwSet = (key) => {
+    if (this.props.hardwareFisico === false) return;
+    if (!this._hwUrl) return;           // carregador ainda não encontrado
+    if (key === this._hwLast) return;   // não repete o mesmo estado
+    this._hwLast = key;
+    const c = HW_LED[key];
+    fetch(this._hwUrl + '/led?r=' + c.r + '&g=' + c.g + '&b=' + c.b + '&mode=' + c.mode)
+      .catch(() => { /* ESP32 fora do alcance — a demo segue só na tela */ });
+  };
+
+  // clique curto no botão físico = plugue: conecta o cabo (âmbar, aguardando o
+  // app liberar a carga), desconecta no meio da carga (interrompe), reconecta
+  // (retoma) ou, com a meta atingida, encerra. Aperto de 1,5s+ = reset geral.
+  hwPoll = () => {
+    if (this.props.hardwareFisico === false) return;
+    if (!this._hwUrl) {
+      // ainda não achou o carregador: tenta de novo a cada ~5s
+      if (++this._hwMiss % 12 === 0) this.hwFind();
+      return;
+    }
+    fetch(this._hwUrl + '/button').then(r => r.json()).then(d => {
+      if (!d) return;
+      if (d.long) { this.hwReset(); return; }
+      if (!d.event) return;
+      if (this.state.running) this.interruptSession();
+      else if (this.state.interrupted) this.resumeSession();
+      else if (this.state.sess) this.finishSession();
+      else if (!this.state.plugged) this.plugIn();
+      else this.plugOut();
+    }).catch(() => { /* silencioso, como o hwSet */ });
+  };
+
+  plugIn = () => {
+    this.setState({ plugged: true });
+    this.hwSet('conectado');
+    this.say('Plugue conectado ao veículo. Toque em Liberar carga para começar.');
+  };
+
+  plugOut = () => {
+    this.setState({ plugged: false });
+    this.hwSet('disponivel');
+    this.say('Plugue desconectado.');
+  };
+
+  hwReset = () => {
+    clearInterval(this._iv);
+    this.setState({ screen: 'role', role: null, logged: false, pendingRole: null, hasSolution: null, tab: 'inicio', sess: null, running: false, interrupted: false, plugged: false, receipt: null, stars: 0, spotId: 's1', mapFilter: 'Todos', histFilter: 'Tudo', goal: 80, method: 'pix', pay: null, cep: '', addr: null, modelo: null, chargers: CHARGERS_INICIAIS.map(c => ({ ...c })) });
+    this._hwLast = null;
+    this.hwSet('disponivel');
+  };
 
   DIAS = [
     { k: 'seg', label: 'Segunda' }, { k: 'ter', label: 'Terça' }, { k: 'qua', label: 'Quarta' },
@@ -73,6 +178,848 @@ class Component extends DCLogic {
     critico: { label: 'Crítico', cor: '#f5333f', tagBg: '#fdeaec', tagFg: '#a3111c' },
     atencao: { label: 'Atenção', cor: '#b97a08', tagBg: '#faeed3', tagFg: '#7a5406' },
     info: { label: 'Informativo', cor: '#3577f1', tagBg: '#dee9fc', tagFg: '#1d4ea8' },
+  };
+
+  // ---- previsão de demanda (machine learning) ----
+  // O motor (MLPrev, em src/ml/previsao-motor.js) roda as árvores treinadas em
+  // inteligencia/. Aqui só se lê o estado do app que entra no modelo: quantas
+  // vagas estão operando agora (a Vaga 03 em falha reduz a capacidade).
+  vagasOperando = () => Math.min(4, this.state.chargers
+    .filter(c => c.site === 'pn' && (c.status === 'livre' || c.status === 'carregando')).length);
+
+  cenarioML = () => ({ vagas: this.vagasOperando() });
+
+  alertasML = () => MLPrev.alertas(this.cenarioML()).map(a => ({
+    ...a, site: 'pn', ml: true,
+    local: 'Galeria Pátio Norte · previsão ML',
+  }));
+
+  abrirPrevisao = (extra = {}) => this.setState(p => ({
+    screen: 'previsao', prevOrigem: p.screen === 'sindico' ? 'sindico' : p.screen === 'alertas' ? 'alertas' : 'dash',
+    tab: p.screen === 'sindico' ? 'sindico' : p.screen === 'alertas' ? 'vagas' : 'mais', ...extra,
+  }));
+
+  acaoAlertaML = (a) => {
+    if (a.acaoTipo === 'vagas') { this.setState({ screen: 'vagas', tab: 'vagas' }); return; }
+    if (a.acaoTipo === 'tarifa') { this.setState({ screen: 'tariff', tab: 'fin' }); return; }
+    if (a.acaoTipo === 'shift') {
+      const dias = (a.dias || [a.d]).map(d => MLPrev.rotuloDia(d).longo + ' ' + MLPrev.rotuloDia(d).data).join(' e ');
+      this.say('Compra fora de ponta programada para ' + dias + ', 03:00–06:00. A bateria entra na ponta cheia.');
+      return;
+    }
+    this.abrirPrevisao({ prevModo: 'dia', prevDia: a.d });
+  };
+
+  // respostas do Síndico Virtual que saem da previsão
+  respostaML = (q) => {
+    const x = q.toLowerCase();
+    const temaPrev = /ampli|bateria maior|mais bateria|comprar bateria|load|shift|desloc|previs|amanh|semana|pr[óo]xim|prever|feriado|calor|frio|chuv|lot(ar|ad)|encher|pico|alerta|segunda|ter[çc]a|quarta|quinta|sexta|s[áa]bado|domingo/;
+    if (!temaPrev.test(x) || /\bfoi\b|fechou|passad/.test(x)) return null;   // passado: outras respostas
+    const cen = this.cenarioML();
+    const nD = MLPrev.dias();
+    const kwh = (v) => Math.round(v).toLocaleString('pt-BR') + ' kWh';
+    const ivEv = MLPrev.iv('ev'), ivGal = MLPrev.iv('galeria');
+    const d0 = /amanh/.test(x) ? 1 : 0;
+    if (/ampli|bateria maior|mais bateria|comprar bateria/.test(x)) {
+      const an = MLPrev.analiseDia(d0, cen);
+      return an.bateria.titulo + ' (' + an.bateria.valor + '). ' + an.bateria.texto + ' Opções: ' + an.bateria.opcoes.map(o => o.rotulo + ' → ' + o.econ + ', ' + o.inv + ', retorno ' + o.payback).join('; ') + '.';
+    }
+    if (/load|shift|desloc/.test(x)) {
+      const dias = [];
+      for (let i = 0; i < nD; i++) { const ls = MLPrev.loadShift(i, cen); if (ls.length) dias.push({ i, ls }); }
+      if (!dias.length) return 'Nenhum dia dos próximos ' + nD + ' pede load-shifting: a sobra de sol já enche a bateria antes da ponta e deslocar carga economizaria menos de R$ 3 por dia.';
+      const tot = dias.reduce((a, x) => a + x.ls.reduce((b, r) => b + r.econ, 0), 0);
+      return 'Load-shifting recomendado em ' + dias.length + ' dos ' + nD + ' dias, economia estimada de R$ ' + Math.round(tot) + '. '
+        + dias.slice(0, 3).map(x => MLPrev.quandoDia(x.i).replace(/^./, c => c.toUpperCase()) + ': ' + x.ls.map(r => r.titulo.toLowerCase() + ' (' + Math.round(r.kwh) + ' kWh, ' + r.de + ' → ' + r.para + ', R$ ' + Math.round(r.econ) + ')').join('; ')).join('. ')
+        + '. O plano hora a hora está na tela Previsão.';
+    }
+    if (/alerta|risco|aviso|problema/.test(x)) {
+      const al = MLPrev.alertas(cen);
+      if (!al.length) return 'A previsão da semana não acende nenhum alerta: a demanda fica abaixo do teto do DLM e há vaga para a procura prevista.';
+      return al.length + (al.length > 1 ? ' alertas' : ' alerta') + ' da previsão para os próximos ' + nD + ' dias. '
+        + al.slice(0, 3).map(a => a.titulo + ' (' + a.quando + '): ' + a.acao).join(' ') + ' Detalhes na tela Previsão.';
+    }
+    const nomesDia = ['segunda', 'ter', 'quarta', 'quinta', 'sexta', 's[áa]bado', 'domingo'];
+    let d = /amanh/.test(x) ? 1 : 0;
+    nomesDia.forEach((n, k) => {
+      if (new RegExp(n).test(x)) {
+        for (let i = 0; i < nD; i++) if (MLPrev.D.calendario[i].dia_semana === k) { d = i; break; }
+      }
+    });
+    if (/semana|pr[óo]xim(os|as) dias/.test(x) && !/amanh/.test(x)) {
+      let te = 0, tg = 0, maior = 0;
+      for (let i = 0; i < nD; i++) {
+        const e = MLPrev.preverDia('ev', i, cen).total;
+        te += e; tg += MLPrev.preverDia('galeria', i, cen).total;
+        if (e > MLPrev.preverDia('ev', maior, cen).total) maior = i;
+      }
+      const rs = MLPrev.resumoSemana(cen);
+      return 'Para os próximos ' + nD + ' dias o modelo prevê ' + kwh(te) + ' nas vagas (±' + Math.round(ivEv.semana_q80_rel * 100) + '%) e '
+        + kwh(tg) + ' na galeria. O dia mais cheio no eletroposto é ' + MLPrev.quandoDia(maior) + ', com '
+        + kwh(MLPrev.preverDia('ev', maior, cen).total) + '. Pico na rede de ' + MLPrev.virg(rs.pico.rede) + ' kW (' + MLPrev.quandoDia(rs.pico.d)
+        + ', ' + rs.pico.h + 'h), ' + Math.round(rs.pct * 100) + '% do teto operacional.';
+    }
+    const e = MLPrev.preverDia('ev', d, cen), g = MLPrev.preverDia('galeria', d, cen);
+    const pk = e.horas.reduce((a, v, h) => (v > e.horas[a] ? h : a), 0);
+    const fmtFx = (f) => f.label.toLowerCase() + ' ' + (f.kwh > 0 ? '+' : '−') + MLPrev.virg(Math.abs(f.kwh)) + ' kWh';
+    const fxEv = MLPrev.explicarDia('ev', d, cen).slice(0, 2).map(fmtFx);
+    const fxGal = MLPrev.explicarDia('galeria', d, cen).slice(0, 2).map(fmtFx);
+    const quando = MLPrev.quandoDia(d).replace(/^./, c => c.toUpperCase());
+    if (/lot|encher|cheio|vaga livre|fila/.test(x)) {
+      const cap = Math.max(1, cen.vagas) * 7;
+      const hs = e.horas.map((v, h) => (v >= cap * 0.72 ? h : -1)).filter(h => h >= 0);
+      return quando + ': ' + (hs.length >= 2
+        ? 'sim, a procura prevista passa de 72% das vagas das ' + hs[0] + 'h às ' + (hs[hs.length - 1] + 1) + 'h, com pico de ' + MLPrev.virg(e.horas[pk]) + ' kWh/h às ' + pk + 'h para ' + cap + ' kW de capacidade.'
+          + (cen.vagas < 4 ? ' Com a Vaga 03 de volta, a capacidade sobe para 28 kW.' : '')
+        : 'não deve lotar. O pico previsto é de ' + MLPrev.virg(e.horas[pk]) + ' kWh/h às ' + pk + 'h, ' + Math.round(e.horas[pk] / cap * 100) + '% da capacidade das vagas.')
+        + ' Total previsto: ' + kwh(e.total) + ' (±' + Math.round(e.total * ivEv.dia_q80_rel) + ').';
+    }
+    return quando + ': ' + kwh(e.total) + ' previstos nas vagas (±' + Math.round(e.total * ivEv.dia_q80_rel)
+      + '), com pico às ' + pk + 'h, e ' + kwh(g.total) + ' na galeria (±' + Math.round(g.total * ivGal.dia_q80_rel) + ').'
+      + (fxEv.length ? ' Nas vagas pesa ' + fxEv.join(' e ') + '.' : '')
+      + (fxGal.length ? ' Na galeria, ' + fxGal.join(' e ') + '.' : '');
+  };
+
+  // divide solar, bateria e rede de cada hora entre galeria e eletroposto, na proporção do consumo da hora
+  // solar, bateria e rede de cada consumidor pela regra do rateio (calculada no motor, hora a hora)
+  porConsumidor = (linhas) => {
+    const z = () => ({ need: 0, sol: 0, bat: 0, rede: 0 });
+    const g = z(), e = z();
+    linhas.forEach(x => {
+      g.need += x.gal; g.sol += x.solGal; g.bat += x.disGal; g.rede += x.redeGal;
+      e.need += x.ev; e.sol += x.solEv; e.bat += x.disEv; e.rede += x.redeEv;
+    });
+    return { g, e };
+  };
+  blocosConsumidor = ({ g, e }, extra = {}) => {
+    const R = (n) => Math.round(n).toLocaleString('pt-BR');
+    const P = (a, b) => (b > 0 ? a / b * 100 : 0);
+    const bloco = (c, nome, ico, cor, sub) => {
+      const ps = P(c.sol, c.need), pb = P(c.bat, c.need), pr = Math.max(0, 100 - ps - pb);
+      return {
+        nome, ico, cor, sub, total: R(c.need) + ' kWh',
+        legenda: [['Sol', ps, '#f2b01e'], ['Bateria', pb, '#149d68'], ['Rede', pr, '#0f2a47']].map(([r, p, k]) => ({ t: r + ' ' + Math.round(p) + '%', cor: k })),
+        bs: ps.toFixed(1) + '%', bb: pb.toFixed(1) + '%', br: pr.toFixed(1) + '%',
+        itens: [
+          { ico: '☀️', rot: 'Solar', kwh: R(c.sol), pct: Math.round(ps) + '%', cor: '#b97a08' },
+          { ico: '🔋', rot: 'Bateria', kwh: R(c.bat), pct: Math.round(pb) + '%', cor: '#0f7a51' },
+          { ico: '🔌', rot: 'Rede', kwh: R(c.rede), pct: Math.round(pr) + '%', cor: '#0f2a47' },
+        ],
+      };
+    };
+    return [bloco(g, 'Galeria', '🏬', '#e08a00', extra.gal || 'condomínio'), bloco(e, 'Eletroposto', '⚡', '#3577f1', extra.ev || 'recarga dos carros')];
+  };
+
+  // linhas "de onde vem a energia": ícone em bloco, anel de progresso com o percentual
+  fontesUI = (lista) => lista.map(f => {
+    const fr = Math.max(0, Math.min(1, parseFloat(f.pct) / 100 || 0)), C = 2 * Math.PI * 15;
+    const tint = { '#f2b01e': '#fff3d6', '#149d68': '#dcf3ea', '#0f2a47': '#e3e8f0' }[f.cor] || '#eceef2';
+    return { ...f, anel: (fr * C).toFixed(1) + ' ' + C.toFixed(1), bgIco: tint };
+  });
+
+  // ---- gráfico de linhas suaves (estilo dos cards de finanças: curva, área com
+  // degradê, linha pontilhada de comparação e um ponto destacado com balão).
+  // Devolve só atributos para o SVG fixo do template (até 3 séries).
+  // series: [{ vals, cor, pontilhada, area }]; destaque: { serie, i, texto }; faixa: [i0, i1]
+  grafLinhas = ({ series, destaque, faixa, banda, W = 330, H = 150, topo = 30, base = 128, maxY, minY = 0 }) => {
+    const n = series[0].vals.length;
+    const x0 = 10, x1 = W - 10;
+    const X = (i) => x0 + (n === 1 ? 0 : i * (x1 - x0) / (n - 1));
+    const M = maxY || Math.max(1e-6, ...series.flatMap(sr => sr.vals.filter(v => v != null)), ...(banda ? banda.sup : []));
+    const Y = (v) => base - (Math.min(Math.max(0, v - minY), M - minY) / Math.max(1e-6, M - minY)) * (base - topo);
+    // interpolação cúbica monotônica (Fritsch–Carlson): suave e sem passar abaixo de zero
+    const curva = (vals) => {
+      const p = vals.map((v, i) => [X(i), Y(v || 0)]);
+      if (p.length < 2) return '';
+      const dx = [], dy = [], m = [];
+      for (let i = 0; i < p.length - 1; i++) { dx.push(p[i + 1][0] - p[i][0]); dy.push(p[i + 1][1] - p[i][1]); m.push(dy[i] / dx[i]); }
+      const t = [m[0]];
+      for (let i = 1; i < p.length - 1; i++) t.push(m[i - 1] * m[i] <= 0 ? 0 : (m[i - 1] + m[i]) / 2);
+      t.push(m[m.length - 1]);
+      for (let i = 0; i < m.length; i++) {
+        if (m[i] === 0) { t[i] = 0; t[i + 1] = 0; continue; }
+        const a = t[i] / m[i], b = t[i + 1] / m[i], h = a * a + b * b;
+        if (h > 9) { const k = 3 / Math.sqrt(h); t[i] = k * a * m[i]; t[i + 1] = k * b * m[i]; }
+      }
+      const f = (v) => v.toFixed(1);
+      let d = 'M' + f(p[0][0]) + ' ' + f(p[0][1]);
+      for (let i = 0; i < p.length - 1; i++) {
+        const h = dx[i] / 3;
+        d += ' C' + f(p[i][0] + h) + ' ' + f(p[i][1] + t[i] * h) + ' ' + f(p[i + 1][0] - h) + ' ' + f(p[i + 1][1] - t[i + 1] * h) + ' ' + f(p[i + 1][0]) + ' ' + f(p[i + 1][1]);
+      }
+      return d;
+    };
+    const bandaD = banda ? 'M' + banda.sup.map((v, i) => X(i).toFixed(1) + ' ' + Y(v).toFixed(1)).join(' L')
+      + ' L' + banda.inf.map((v, i) => [X(i), Y(v)]).reverse().map(p => p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' L') + ' Z' : '';
+    const out = { bd: bandaD, vb: '0 0 ' + W + ' ' + H, base: base.toFixed(1), xs: Array.from({ length: n }, (_, i) => (X(i) / W * 100).toFixed(2) + '%') };
+    out.zero = minY < 0 ? 'M' + x0 + ' ' + Y(0).toFixed(1) + ' L' + x1 + ' ' + Y(0).toFixed(1) : '';
+    for (let k = 0; k < 4; k++) {
+      const sr = series[k];
+      const d = sr ? curva(sr.vals) : '';
+      out['l' + (k + 1)] = d;
+      out['a' + (k + 1)] = sr && sr.area && d ? d + ' L' + X(n - 1).toFixed(1) + ' ' + base + ' L' + X(0).toFixed(1) + ' ' + base + ' Z' : '';
+      out['c' + (k + 1)] = sr ? sr.cor : 'none';
+      out['p' + (k + 1)] = sr && sr.pontilhada ? '0.1 6' : 'none';
+      out['w' + (k + 1)] = sr ? (sr.pontilhada ? '3' : '2.6') : '0';
+    }
+    // faixa sombreada (ponta 17h–21h)
+    if (faixa) {
+      const step = (x1 - x0) / (n - 1);
+      out.fx = (X(faixa[0]) - step / 2).toFixed(1); out.fw = ((faixa[1] - faixa[0] + 1) * step).toFixed(1); out.fv = 'visible';
+    } else { out.fx = '0'; out.fw = '0'; out.fv = 'hidden'; }
+    // ponto destacado + balão
+    if (destaque) {
+      const sr = series[destaque.serie || 0];
+      const cx = X(destaque.i), cy = Y(sr.vals[destaque.i] || 0);
+      const tw = Math.max(44, destaque.texto.length * 5.6 + 16), th = 20;
+      const tx = Math.min(W - tw - 2, Math.max(2, cx - tw / 2)), ty = Math.max(2, cy - th - 12);
+      Object.assign(out, {
+        hx: cx.toFixed(1), hy: cy.toFixed(1), hcor: sr.cor, hv: 'visible',
+        guia: 'M' + cx.toFixed(1) + ' ' + (ty + th).toFixed(1) + ' L' + cx.toFixed(1) + ' ' + base,
+        texto: destaque.texto, balaoX: (Math.min(W - tw / 2 - 2, Math.max(tw / 2 + 2, cx)) / W * 100).toFixed(2) + '%', balaoY: (ty / H * 100).toFixed(2) + '%', balaoVis: 'block',
+      });
+    } else Object.assign(out, { hx: '0', hy: '0', hcor: 'none', hv: 'hidden', guia: '', texto: '', balaoX: '0', balaoY: '0', balaoVis: 'none' });
+    return [out];
+  };
+
+  // valores de tela da Previsão, do card do Início e do Síndico
+  valsPrevisao = (s, scr) => {
+    const chip = (on) => ({
+      border: on ? '#00d1ff' : '#e4e5e9', espessura: on ? '2px' : '1.5px',
+      sombra: on ? '0 0 10px rgba(0,209,255,.55)' : 'none', fg: on ? '#131c2e' : '#5d6572',
+    });
+    const v = MLPrev.virg;
+    const kwh = (n) => (Math.round(n) || 0).toLocaleString('pt-BR');
+    const sinal = (n) => (n >= 0 ? '+' : '−') + v(Math.abs(n)) + ' kWh';
+    const vagasReais = this.vagasOperando();
+    const cenBase = { vagas: vagasReais };
+    const cen = { vagas: s.prevVagasSim != null ? s.prevVagasSim : vagasReais, ...(s.prevTemp ? { tempDelta: s.prevTemp } : {}) };
+    const simulando = !!s.prevTemp || (s.prevVagasSim != null && s.prevVagasSim !== vagasReais);
+    const alvo = s.prevAlvo || 'ev';
+    const nD = MLPrev.dias();
+    const d = Math.min(nD - 1, s.prevDia || 0);
+    const IV = MLPrev.iv(alvo);
+    const D = MLPrev.D;
+    const met = D.metricas[alvo];
+
+    const dia = MLPrev.preverDia(alvo, d, cen);
+    const cal = D.calendario[d];
+    const rot = MLPrev.rotuloDia(d);
+    const rede = MLPrev.redeDia(d, cen);
+    const pr = rede.reduce((a, b) => (b.rede > a.rede ? b : a));
+    const pctTeto = pr.rede / MLPrev.LIMITE;
+    // balanço de energia do dia: necessária (galeria + vagas) e de onde vem (solar, bateria, rede)
+    const B = MLPrev.balanco(d, cen);
+    const LS = MLPrev.balancoComShift(d, cen);
+    const IVg = MLPrev.iv('galeria'), IVe = MLPrev.iv('ev');
+    const faixaNeed = (g, e, k) => Math.sqrt((g * IVg[k]) ** 2 + (e * IVe[k]) ** 2);   // erros independentes
+    const BRL0 = (n) => 'R$ ' + Math.round(n).toLocaleString('pt-BR');
+    const pct = (a, b) => (b > 0 ? Math.round(a / b * 100) : 0) + '%';
+    const COR = { sol: '#f2b01e', bat: '#149d68', rede: '#0f2a47' };
+    const graf = s.prevGraf || 'fonte';
+    const progDia = (s.prevShiftProg || {})[d];
+    const icone = (c) => {
+      const irr = c.irradiancia.reduce((a, b) => a + b, 0) / 1000, ch = c.precipitacao.reduce((a, b) => a + b, 0);
+      return ch > 2 ? '🌧️' : irr > 6.2 ? '☀️' : irr > 4.5 ? '🌤️' : '☁️';
+    };
+    const clima = dia.clima;
+    const chuvaDia = clima.precipitacao.reduce((a, b) => a + b, 0);
+
+    const semana = [];
+    for (let i = 0; i < nD; i++) {
+      const e = MLPrev.preverDia('ev', i, cen), g = MLPrev.preverDia('galeria', i, cen);
+      const bi = MLPrev.balanco(i, cen), ls = MLPrev.loadShift(i, cen);
+      semana.push({ i, e: e.total, g: g.total, b: bi, ls, econ: ls.reduce((a, r) => a + r.econ, 0), clima: e.clima, cal: D.calendario[i], r: MLPrev.rotuloDia(i) });
+    }
+    const SW = (k) => semana.reduce((a, x) => a + x.b[k], 0);
+    const totSem = SW('need');
+    const econSem = semana.reduce((a, x) => a + x.econ, 0);
+    // semana passada medida (galeria + vagas)
+    const somaHist = (arr) => arr.slice(arr.length - 168).reduce((a, b) => a + (b == null ? 0 : b), 0);   // null = hora sem medição
+    const semPassada = somaHist(D.historico.ev) + somaHist(D.historico.galeria);
+    // referência típica: MEDIANA do histórico medido (6 semanas). A mediana não se deixa puxar
+    // por um feriado, um evento ou um dia de recarga fora do comum, como a média faria.
+    const mediana = (xs) => { const a = xs.filter(x => x != null).sort((p, q) => p - q); if (!a.length) return null; const m = a.length >> 1; return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2; };
+    const somaJanela = (arr, i0, n, minimo) => { let t = 0, k = 0; for (let i = i0; i < i0 + n; i++) if (arr[i] != null) { t += arr[i]; k++; } return k >= minimo ? t * n / k : null; };
+    const NDH = Math.floor(D.historico.ev.length / 24);
+    const medDiaSemana = (arr, dd) => {           // mesmo dia da semana do dia previsto dd, nas 6 semanas medidas
+      const xs = []; for (let k = 0; k < NDH; k++) if ((NDH - k + dd) % 7 === 0) xs.push(somaJanela(arr, k * 24, 24, 20));
+      return { med: mediana(xs), n: xs.filter(x => x != null).length };
+    };
+    const medSemanas = (arr) => { const xs = []; for (let w = 0; w < Math.floor(NDH / 7); w++) xs.push(somaJanela(arr, w * 168, 168, 150)); return { med: mediana(xs), n: xs.filter(x => x != null).length }; };
+    const pillComp = (val, ref) => {
+      if (ref == null || ref <= 0) return { comp: '', compBg: 'transparent', compFg: 'transparent' };
+      const dv = (val / ref - 1) * 100;
+      return { comp: (dv >= 0 ? '+' : '−') + v(Math.abs(dv), 0) + '% vs mediana', compBg: dv >= 0 ? 'rgba(245,51,63,.18)' : 'rgba(20,157,104,.22)', compFg: dv >= 0 ? '#ffb3b9' : '#8ff0c4' };
+    };
+
+    const alertas = MLPrev.alertas(cenBase);
+    const fx = [...MLPrev.explicarDia('galeria', d, cen).map(f => ({ ...f, onde: 'Galeria' })),
+      ...MLPrev.explicarDia('ev', d, cen).map(f => ({ ...f, onde: 'Eletroposto' }))]
+      .sort((a, b) => Math.abs(b.kwh) - Math.abs(a.kwh)).slice(0, 6);
+    const maxFx = Math.max(1, ...fx.map(f => Math.abs(f.kwh)));
+
+    const evHoje = MLPrev.preverDia('ev', 0, cenBase), galHoje = MLPrev.preverDia('galeria', 0, cenBase);
+    const bt = D.backtest[alvo];
+    const imp = Object.entries(met.importancia_grupos).slice(0, 6);
+    const grp = met.por_tipo_de_dia_erro_dia_pct || {};
+    const mDia = met.modelo, mBase = met.baseline_media_4_semanas;
+
+    return {
+      scPrevisao: scr('previsao'),
+      goPrevisao: () => this.abrirPrevisao({ prevModo: 'dia', prevDia: 0 }),
+      goPrevisaoSemana: () => this.abrirPrevisao({ prevModo: 'semana' }),
+      backFromPrevisao: () => this.setState(p => (p.prevOrigem === 'sindico'
+        ? { screen: 'sindico', tab: 'sindico' }
+        : p.prevOrigem === 'alertas' ? { screen: 'alertas', tab: 'vagas' } : { screen: 'dash', tab: 'mais' })),
+      prevSub: D.galeria + ' · ' + (s.prevModo === 'semana' ? 'próximos ' + nD + ' dias' : 'hora a hora'),
+      prevModoTabs: [['dia', 'Dia'], ['semana', 'Semana']].map(([k, l]) => ({ label: l, ...chip((s.prevModo || 'dia') === k), onPick: () => this.setState({ prevModo: k }) })),
+      prevAlvoTabs: [['galeria', 'Galeria'], ['ev', 'Eletroposto']].map(([k, l]) => ({ label: l, ...chip(alvo === k), onPick: () => this.setState({ prevAlvo: k }) })),
+      prevGrafTabs: [['fonte', 'De onde vem'], ['consumo', 'Quem consome']].map(([k, l]) => ({ label: l, ...chip(graf === k), onPick: () => this.setState({ prevGraf: k }) })),
+      prevModoDia: (s.prevModo || 'dia') === 'dia',
+      prevModoSemana: s.prevModo === 'semana',
+      prevDias: semana.map(x => ({
+        top: x.r.rel || x.r.curto, num: x.r.num, ...chip(x.i === d),
+        border: x.i === d ? '#d31e2c' : '#e4e5e9', espessura: '1.5px', sombra: x.i === d ? '0 6px 14px rgba(211,30,44,.28)' : 'none',
+        bg: x.i === d ? '#d31e2c' : '#fff', fg: x.i === d ? '#fff' : '#131c2e', fgTop: x.i === d ? 'rgba(255,255,255,.85)' : '#7c8494',
+        marca: x.ls.length ? (x.i === d ? '#fff' : '#0f7a51') : x.cal.feriado ? (x.i === d ? '#fff' : '#00a6cc') : 'transparent',
+        onPick: () => this.setState({ prevDia: x.i, prevSindAberto: null, prevSindOpc: null }),
+      })),
+      // ---- dia
+      prevDiaTitulo: 'Previsão de demanda · ' + (rot.rel ? rot.rel.toLowerCase() + ', ' : '') + rot.longo + ' ' + rot.data,
+      prevDiaValor: kwh(B.need) + ' kWh',
+      prevDiaFaixa: 'entre ' + kwh(B.need - faixaNeed(B.gal, B.ev, 'dia_q80_rel')) + ' e ' + kwh(B.need + faixaNeed(B.gal, B.ev, 'dia_q80_rel')) + ' kWh · 80% de confiança',
+      // previsão de demanda separada: galeria e eletroposto, cada um com faixa, pico e comparação
+      prevDemandas: (() => {
+        const NH = D.historico.ev.length;
+        const card = (alvo, nome, ico, cor, det) => {
+          const hs = B.linhas.map(x => x[alvo === 'ev' ? 'ev' : 'gal']);
+          const tot = hs.reduce((a, b) => a + b, 0), iv = MLPrev.iv(alvo).dia_q80_rel;
+          const pk = hs.reduce((a, x, h) => (x > hs[a] ? h : a), 0);
+          const md = medDiaSemana(D.historico[alvo === 'ev' ? 'ev' : 'galeria'], d);
+          return {
+            nome, ico, cor, det, valor: kwh(tot), un: 'kWh',
+            faixa: kwh(tot * (1 - iv)) + '–' + kwh(tot * (1 + iv)) + ' kWh',
+            pico: 'pico às ' + String(pk).padStart(2, '0') + 'h · ' + v(hs[pk]) + ' kWh',
+            ...pillComp(tot, md.med),
+            ref: md.med == null ? '' : 'mediana das ' + md.n + ' últimas ' + rot.longo.replace(/^(segunda|terça|quarta|quinta|sexta)$/, '$1s').replace(/^sábado$/, 'sábados').replace(/^domingo$/, 'domingos') + ': ' + kwh(md.med) + ' kWh',
+          };
+        };
+        return [card('galeria', 'Galeria', '🏬', '#ffd27a', 'condomínio · aberta ' + cal.abre + 'h–' + cal.fecha + 'h'),
+                card('ev', 'Eletroposto', '⚡', '#7fb2ff', cen.vagas + ' vagas · ' + cal.ep_abre + 'h–' + cal.ep_fecha + 'h')];
+      })(),
+      // consumo previsto (galeria e eletroposto) e geração solar / bateria no mesmo gráfico
+      ...(() => {
+        const L = B.linhas;
+        const bat = L.map(x => x.dis - x.cargaSol - x.cargaRede);          // + entrega, − carrega
+        const ser = [
+          { vals: L.map(x => x.gal), cor: '#d31e2c', nome: 'Consumo galeria' },
+          { vals: L.map(x => x.ev), cor: '#3577f1', nome: 'Consumo eletroposto' },
+          { vals: L.map(x => x.sol), cor: '#e9a000', pontilhada: true, nome: 'Geração solar' },
+          { vals: bat, cor: '#149d68', nome: 'Bateria (+ entrega · − carrega)' },
+        ];
+        const minY = Math.min(0, ...bat) * 1.15;
+        const pkS = L.reduce((a, x) => (x.sol > a.sol ? x : a));
+        const cheia = B.cheiaAs;
+        return {
+          prevGC: this.grafLinhas({ H: 190, topo: 30, base: 172, minY, series: ser, faixa: [MLPrev.PONTA[0], MLPrev.PONTA[1] - 1],
+            destaque: { serie: 2, i: pkS.h, texto: 'sol ' + String(pkS.h).padStart(2, '0') + 'h · ' + v(pkS.sol) + ' kWh' } }),
+          prevGCLeg: ser.map(x => ({ label: x.nome, cor: x.cor, estilo: x.pontilhada ? 'dotted' : 'solid' })),
+          prevGCResumo: [
+            { cor: '#d31e2c', t: 'Galeria ' + kwh(B.gal) + ' kWh · pico ' + String(L.reduce((a, x) => (x.gal > a.gal ? x : a)).h).padStart(2, '0') + 'h' },
+            { cor: '#3577f1', t: 'Eletroposto ' + kwh(B.ev) + ' kWh · pico ' + String(L.reduce((a, x) => (x.ev > a.ev ? x : a)).h).padStart(2, '0') + 'h' },
+            { cor: '#e9a000', t: 'Solar ' + kwh(B.sol) + ' kWh gerados · pico ' + String(pkS.h).padStart(2, '0') + 'h' },
+            { cor: '#149d68', t: 'Bateria carrega ' + kwh(B.solBat + B.compra) + ' kWh' + (cheia != null ? ' (cheia às ' + String(cheia + 1).padStart(2, '0') + 'h)' : '') + ' e entrega ' + kwh(B.bat) + ' kWh na ponta' },
+          ],
+        };
+      })(),
+      // banner de load shifting: comprar da rede no horário mais barato e guardar na bateria para a ponta
+      ...(() => {
+        const PC = MLPrev.balanco(d, cen, { preCarga: true });
+        const econ = B.custo - PC.custo, compra = PC.compra;
+        const vis = compra >= 1 && econ >= 1;
+        const irr = clima.irradiancia.reduce((a, b) => a + b, 0), irrN = D.normais.irradiancia.reduce((a, b) => a + b, 0);
+        const pb = Math.round(B.soc17 / D.bessKwh * 100);
+        const prog = (s.prevPcProg || {})[d];
+        const T = MLPrev.TARIFA;
+        const brl = (n) => 'R$ ' + n.toFixed(2).replace('.', ',');
+        return {
+          prevPcVis: vis,
+          prevPcMotivo: (irr < irrN * 0.7 ? 'Pouco sol hoje (' + Math.round(irr / irrN * 100) + '% do normal de outubro): ' : 'Ainda sobra espaço nas baterias: ')
+            + 'sem a compra, as baterias entram na ponta com ' + pb + '% de carga. A compra completa o que o sol não enche.',
+          prevPcPassos: [
+            { hora: '03h–06h', acao: 'Comprar ' + kwh(compra) + ' kWh da rede', preco: brl(T.fora) + '/kWh · horário mais barato', cor: '#0f7a51', bg: '#dcf3ea' },
+            { hora: '17h–21h', acao: 'Usar a energia guardada na ponta', preco: 'em vez de pagar ' + brl(T.ponta) + '/kWh', cor: '#a3111c', bg: '#fdeaec' },
+          ],
+          prevPcEcon: 'R$ ' + econ.toFixed(2).replace('.', ',') + '/dia',
+          prevPcCompra: kwh(compra) + ' kWh',
+          prevPcDica: (irr < irrN * 0.7 ? 'Pouco sol hoje (' + Math.round(irr / irrN * 100) + '% do normal): ' : 'Ainda sobra espaço nas baterias: ')
+            + 'sem compra, as baterias entram na ponta com ' + pb + '% de carga. Comprar ' + kwh(compra) + ' kWh fora de ponta às 3h, a ' + brl(T.fora)
+            + ', e devolver pela bateria das 17h às 21h, no lugar de ' + brl(T.ponta) + '/kWh.',
+          prevPcRede: 'Rede na ponta: ' + kwh(B.redePonta) + ' → ' + kwh(PC.redePonta) + ' kWh',
+          prevPcBotao: prog ? '✓ Compra fora de ponta programada' : 'Programar compra fora de ponta',
+          prevPcBotaoBg: prog ? 'rgba(0,209,255,.16)' : '#00d1ff', prevPcBotaoFg: prog ? '#7fd9f2' : '#08243c',
+          prevPcProgramar: () => {
+            this.setState(p => ({ prevPcProg: { ...(p.prevPcProg || {}), [d]: true } }));
+            this.say('Compra programada para ' + rot.longo + ' ' + rot.data + ': ' + kwh(compra) + ' kWh entre 03h e 06h, para usar na ponta das 17h às 21h.');
+          },
+        };
+      })(),
+      ...(() => {
+        const T = MLPrev.TARIFA, brl = (n) => 'R$ ' + n.toFixed(2).replace('.', ',');
+        const PC = MLPrev.balanco(d, cen, { preCarga: true });
+        const econPC = B.custo - PC.custo;
+        const progPC = (s.prevPcProg || {})[d];
+        const botao = (feito, txt, txtOk) => ({ prevOriBotao: feito ? '✓ ' + txtOk : txt, prevOriBotaoBg: feito ? 'rgba(0,209,255,.16)' : '#00d1ff', prevOriBotaoFg: feito ? '#7fd9f2' : '#08243c' });
+        if (PC.compra >= 1 && econPC >= 1) {
+          const ocultar = { prevSindCompraVis: false, prevSindShiftVis: true };
+          const irr = clima.irradiancia.reduce((a, b) => a + b, 0), irrN = D.normais.irradiancia.reduce((a, b) => a + b, 0);
+          return {
+            ...ocultar, prevOriTitulo: 'Load shifting recomendado', prevOriJanela: '03:00 → 06:00',
+            prevOriDica: (irr < irrN * 0.7 ? 'Pouco sol hoje (' + Math.round(irr / irrN * 100) + '% do normal): ' : 'Ainda sobra espaço nas baterias: ')
+              + 'sem compra, as baterias entram na ponta com ' + Math.round(B.soc17 / D.bessKwh * 100) + '% de carga. Comprar fora de ponta às 3h, a ' + brl(T.fora)
+              + ', e devolver pela bateria na ponta das 17h às 21h, no lugar de ' + brl(T.ponta) + '/kWh.',
+            prevOriT1: 'Comprar fora de ponta', prevOriV1: kwh(PC.compra) + ' kWh',
+            prevOriT2: 'Economia estimada', prevOriV2: brl(econPC) + '/dia', prevOriV2Cor: '#9dff33',
+            ...botao(progPC, 'Programar compra fora de ponta', 'Compra fora de ponta programada'),
+            prevOriAcao: () => { this.setState(p => ({ prevPcProg: { ...(p.prevPcProg || {}), [d]: true } }));
+              this.say('Compra programada para ' + rot.longo + ' ' + rot.data + ': ' + kwh(PC.compra) + ' kWh entre 03h e 06h, para usar na ponta das 17h às 21h.'); },
+          };
+        }
+        if (LS) {
+          const r = LS.recs[0];
+          const econ = B.custo - LS.depois.custo;
+          const ev = r.tipo === 'ev';
+          const evPonta = B.linhas.filter(x => x.ponta).reduce((a, x) => a + x.ev, 0);
+          return {
+            prevSindCompraVis: true, prevSindShiftVis: false,
+            prevOriTitulo: 'Load shifting recomendado', prevOriJanela: r.para.replace(/h/g, ':00').replace('–', ' → '),
+            prevOriDica: ev
+              ? 'As vagas devem consumir ' + kwh(evPonta) + ' kWh na ponta, quando a rede custa ' + brl(T.ponta) + '/kWh, enquanto sobra sol das ' + r.para.replace('–', ' às ') + '. Desconto solar maior nesse horário e acréscimo na ponta levam parte das recargas para o sol, e a bateria sobra para a galeria.'
+              : 'Dia quente com sol sobrando das ' + r.para.replace('–', ' às ') + ': pré-resfriar a galeria nesse horário e aliviar a climatização na ponta, quando a rede custa ' + brl(T.ponta) + '/kWh.',
+            prevOriT1: ev ? 'Recarga deslocada' : 'Climatização deslocada', prevOriV1: kwh(r.kwh) + ' kWh',
+            prevOriT2: 'Economia estimada', prevOriV2: brl(econ) + '/dia', prevOriV2Cor: '#9dff33',
+            ...botao(progDia, ev ? 'Programar tarifa de load shifting' : 'Programar pré-resfriamento', 'Load shifting programado'),
+            prevOriAcao: () => {
+              this.setState(p => ({ prevShiftProg: { ...(p.prevShiftProg || {}), [d]: true } }));
+              this.say('Load shifting programado para ' + rot.longo + ' ' + rot.data + ': ' + LS.recs.map(x => x.titulo.toLowerCase() + ' (' + Math.round(x.kwh) + ' kWh, ' + x.de + ' → ' + x.para + ')').join('; ') + '.');
+            },
+          };
+        }
+        return {
+          prevSindCompraVis: true, prevSindShiftVis: true,
+          prevOriTitulo: 'Nenhum load shifting hoje', prevOriJanela: 'sem ação',
+          prevOriDica: 'O sol enche as baterias antes da ponta e deslocar carga economizaria menos de R$ 3. A operação padrão já é a mais barata hoje.',
+          prevOriT1: 'Bateria na ponta', prevOriV1: kwh(B.bat) + ' kWh', prevOriT2: 'Rede na ponta', prevOriV2: kwh(B.redePonta) + ' kWh', prevOriV2Cor: '#f2f6fb',
+          prevOriBotao: 'Perguntar ao Síndico', prevOriBotaoBg: 'rgba(255,255,255,.12)', prevOriBotaoFg: '#f2f6fb',
+          prevOriAcao: () => { this.setState({ screen: 'sindico', tab: 'sindico' }); this.ask('Qual a previsão para a semana?'); },
+        };
+      })(),
+      prevTotalDia: 'Total do prédio: ' + kwh(B.need) + ' kWh (entre ' + kwh(B.need - faixaNeed(B.gal, B.ev, 'dia_q80_rel')) + ' e ' + kwh(B.need + faixaNeed(B.gal, B.ev, 'dia_q80_rel')) + ')',
+      prevSplit: [
+        { label: 'Galeria', det: 'condomínio · aberta ' + cal.abre + 'h–' + cal.fecha + 'h', kwh: kwh(B.gal) + ' kWh', pct: pct(B.gal, B.need), barra: pct(B.gal, B.need), cor: '#ffd27a' },
+        { label: 'Eletroposto', det: cen.vagas + ' vagas · aberto ' + cal.ep_abre + 'h–' + cal.ep_fecha + 'h', kwh: kwh(B.ev) + ' kWh', pct: pct(B.ev, B.need), barra: pct(B.ev, B.need), cor: '#7fb2ff' },
+      ],
+      prevConsumidores: this.blocosConsumidor(this.porConsumidor(B.linhas), { gal: 'aberta ' + cal.abre + 'h–' + cal.fecha + 'h', ev: cen.vagas + ' vagas · ' + cal.ep_abre + 'h–' + cal.ep_fecha + 'h' }),
+      prevFontes: this.fontesUI([
+        { ico: '☀️', label: 'Solar', kwh: kwh(B.solUso) + ' kWh', pct: pct(B.solUso, B.need), barra: pct(B.solUso, B.need), cor: COR.sol,
+          det: 'usado na hora, de ' + kwh(B.sol) + ' kWh gerados nas placas' },
+        { ico: '🔋', label: 'Bateria', kwh: kwh(B.bat) + ' kWh', pct: pct(B.bat, B.need), barra: pct(B.bat, B.need), cor: COR.bat,
+          det: 'na ponta (17h–21h) · entra com ' + Math.round(B.soc17 / D.bessKwh * 100) + '% de ' + v(D.bessKwh, 0) + ' kWh' },
+        { ico: '🔌', label: 'Rede', kwh: kwh(B.rede) + ' kWh', pct: pct(B.rede - B.compra, B.need), barra: pct(B.rede - B.compra, B.need), cor: COR.rede,
+          det: kwh(B.redePonta) + ' kWh na ponta e ' + kwh(B.redeFora) + ' kWh fora dela' },
+      ]),
+      // armazenamento: quanto do sol que sobra cabe nas baterias instaladas
+      ...(() => {
+        const MOD = 15, EFB = 0.95;                                   // módulo de 15 kWh, como no simulador de viabilidade
+        const nMod = Math.round(D.bessKwh / MOD), util = D.bessKwh * 0.9;
+        const sobra = B.solBat + B.exp;
+        const fr = sobra > 0 ? B.solBat / sobra : 0;
+        const defPonta = B.linhas.filter(x => x.ponta).reduce((a, x) => a + Math.max(0, x.need - x.sol), 0);
+        const aproveitavel = Math.min(sobra * EFB, defPonta / EFB);     // o que caberia E seria usado na ponta
+        const capNec = aproveitavel / 0.9;
+        const modNec = Math.max(nMod, Math.ceil(capNec / MOD));
+        return {
+          prevArmChip: nMod + (nMod > 1 ? ' módulos' : ' módulo') + ' · ' + v(D.bessKwh, 0) + ' kWh',
+          prevArmVis: sobra > 0.5,
+          prevArmNada: sobra <= 0.5,
+          prevArmTitulo: 'Sobram ' + kwh(sobra) + ' kWh de sol; as baterias guardam ' + kwh(B.solBat * EFB) + ' kWh (' + Math.round(fr * 100) + '% da sobra)',
+          prevArmGuarda: (fr * 100).toFixed(1) + '%', prevArmExporta: ((1 - fr) * 100).toFixed(1) + '%',
+          prevArmLegG: 'para a bateria ' + kwh(B.solBat) + ' kWh', prevArmLegE: 'vai para a rede ' + kwh(B.exp) + ' kWh',
+          prevArmLinhas: [
+            { k: 'Capacidade útil', v: v(util, 0) + ' kWh (de 10% a 100%) · ' + nMod + ' × ' + MOD + ' kWh' },
+            { k: 'Bateria cheia', v: B.cheiaAs != null ? 'às ' + String(B.cheiaAs + 1).padStart(2, '0') + 'h · depois disso o sol que sobra é exportado' : 'não enche hoje: todo o sol que sobra é guardado' },
+            { k: 'Para cobrir a ponta', v: modNec > nMod
+                ? 'a ponta precisa de ' + kwh(defPonta) + ' kWh além do sol: seriam ~' + kwh(capNec) + ' kWh de bateria, ' + modNec + ' módulos (+' + (modNec - nMod) + '). Acima disso a sobra não teria onde ser usada'
+                : 'as ' + nMod + ' baterias já bastam: a ponta usa ' + kwh(defPonta) + ' kWh além do sol' },
+          ],
+        };
+      })(),
+      prevSolarResumo: '☀️ ' + kwh(B.sol) + ' kWh gerados: ' + kwh(B.solUso) + ' usados na hora, ' + kwh(B.solBat) + ' guardados na bateria, ' + kwh(B.exp) + ' exportados para a rede.',
+      // versão simples do "de onde vem a energia" (para o gestor, sem termos técnicos)
+      ...(() => {
+        const verde = B.solUso + B.bat, pv = B.need > 0 ? Math.round(verde / B.need * 100) : 0;
+        const socMax = Math.max(B.socIni, ...B.linhas.filter(x => x.h < MLPrev.PONTA[0]).map(x => x.soc));
+        const pb = Math.max(0, Math.min(100, Math.round(socMax / D.bessKwh * 100)));
+        const hh = (h) => String(h).padStart(2, '0') + 'h';
+        return {
+          prevFonteTitulo: pv + '% da energia de hoje vem do sol e da bateria',
+          prevFonteSub: 'O restante, ' + kwh(B.rede) + ' kWh, vem da rede da Enel · gasto previsto de R$ ' + Math.round(B.custo).toLocaleString('pt-BR'),
+          prevFontePct: pv + '%',
+          prevBatPct: pb + '%', prevBatFill: pb + '%', prevBatCor: pb >= 95 ? '#149d68' : pb >= 50 ? '#7cc9a4' : '#f2b01e',
+          prevBatTitulo: B.cheiaAs != null ? 'Baterias cheias às ' + hh(B.cheiaAs + 1) : 'Baterias chegam a ' + pb + '%',
+          prevBatTexto: (B.cheiaAs != null
+            ? 'O sol enche as baterias de manhã, e elas devolvem essa energia no fim da tarde (17h às 21h), quando a energia da rede é mais cara.'
+            : 'Hoje o sol é fraco e não chega a encher as baterias. A energia guardada é usada no fim da tarde (17h às 21h).')
+            + (B.exp > 1 ? ' Depois de cheias, ' + kwh(B.exp) + ' kWh de sol que sobram vão para a rede.' : ''),
+        };
+      })(),
+      prevCustoTxt: 'Custo estimado da energia da rede: ' + BRL0(B.custo) + ' no dia (ponta R$ 1,50/kWh, fora de ponta R$ 0,85/kWh, menos o crédito do que é exportado).',
+      // gráfico hora a hora: linhas suaves; ponto destacado no maior valor da linha principal
+      ...(() => {
+        const L = B.linhas;
+        const ser = graf === 'fonte'
+          ? [{ vals: L.map(x => x.need), cor: '#d31e2c', area: true, nome: 'Necessária' },
+             { vals: L.map(x => x.sol), cor: '#e9a000', pontilhada: true, nome: 'Geração solar' },
+             { vals: L.map(x => x.rede), cor: '#0f2a47', nome: 'Da rede' }]
+          : [{ vals: L.map(x => x.gal), cor: '#d31e2c', area: true, nome: 'Galeria' },
+             { vals: L.map(x => x.ev), cor: '#0f2a47', pontilhada: true, nome: 'Eletroposto' }];
+        const sd = graf === 'fonte' ? 2 : 0;                      // destaque: pico da rede / pico da galeria
+        const iMax = ser[sd].vals.reduce((a, v, i, arr) => (v > arr[a] ? i : a), 0);
+        return {
+          prevGH: this.grafLinhas({ series: ser, faixa: [MLPrev.PONTA[0], MLPrev.PONTA[1] - 1],
+            destaque: { serie: sd, i: iMax, texto: String(iMax).padStart(2, '0') + 'h · ' + v(ser[sd].vals[iMax]) + ' kWh' } }),
+          prevGrafLegenda: ser.map(x => ({ label: x.nome, cor: x.cor, estilo: x.pontilhada ? 'dotted' : 'solid' })),
+          prevHorasLbl: ['00h', '06h', '12h', '18h', '23h'],
+          prevGrafPill: graf === 'fonte' ? pct(B.solUso + B.bat, B.need) + ' solar + bateria' : pct(B.ev, B.need) + ' eletroposto',
+        };
+      })(),
+      // Síndico Virtual lendo o gráfico do dia: veredito, 3 números, decisões que abrem ao toque
+      ...(() => {
+        const an = MLPrev.analiseDia(d, cen), U = an.ui;
+        const aberto = s.prevSindAberto || null;
+        const iOp = s.prevSindOpc != null ? s.prevSindOpc : U.bateria.melhor;
+        const op = U.bateria.opcoes[iOp];
+        const selo = (ok, nao) => ({ selo: ok ? 'Vale a pena' : nao, seloBg: ok ? 'rgba(157,255,51,.16)' : 'rgba(255,255,255,.1)', seloFg: ok ? '#9dff33' : '#dbe6f2' });
+        const toggle = (k) => () => this.setState(p => ({ prevSindAberto: p.prevSindAberto === k ? null : k }));
+        return {
+          prevSindVeredito: LS ? LS.recs[0].titulo : U.veredito,
+          prevSindShift: {
+            selo: LS ? 'Vale a pena' : 'Não hoje', seloBg: LS ? 'rgba(157,255,51,.16)' : 'rgba(255,255,255,.1)', seloFg: LS ? '#9dff33' : '#dbe6f2',
+            linha: LS ? 'Economia de R$ ' + Math.round(B.custo - LS.depois.custo) + ' no dia' : (B.exp < 3 ? 'Quase não sobra sol hoje' : 'Ganho abaixo de R$ 3'),
+            seta: aberto === 'shift' ? '⌃' : '⌄', onPick: toggle('shift'),
+          },
+          prevSindShiftAberto: aberto === 'shift',
+          prevSindShiftVazio: aberto === 'shift' && !LS,
+          prevSindFrase: U.frase,
+          prevSindKpis: U.kpis,
+          prevSindCompra: { ...selo(U.compra.ok, 'Não agora'), linha: U.compra.linha, aberto: aberto === 'compra', seta: aberto === 'compra' ? '⌃' : '⌄', onPick: toggle('compra') },
+          prevSindCompraPontos: U.compra.pontos.map(t => ({ t })),
+          prevSindCompraAberto: aberto === 'compra',
+          prevSindBat: { ...selo(U.bateria.ok, 'Retorno longo'), linha: U.bateria.linha, seta: aberto === 'bateria' ? '⌃' : '⌄', onPick: toggle('bateria') },
+          prevSindBatAberto: aberto === 'bateria',
+          prevSindOpcoes: U.bateria.opcoes.map((o, i) => ({
+            rotulo: o.rotulo + ' kWh', on: i === iOp, bg: i === iOp ? '#00d1ff' : 'rgba(255,255,255,.08)', fg: i === iOp ? '#08243c' : '#f2f6fb', borda: i === iOp ? '#00d1ff' : 'transparent',
+            onPick: () => this.setState({ prevSindOpc: i }),
+          })),
+          prevSindOpStats: [
+            { valor: op.payback, rotulo: 'retorno' },
+            { valor: op.econ, rotulo: 'economia/ano' },
+            { valor: op.inv, rotulo: 'investimento' },
+          ],
+          prevSindOpHoje: 'Hoje, rede na ponta: ' + U.bateria.redePontaHoje + ' → ' + op.redePonta + ' kWh · exportação: ' + U.bateria.expHoje + ' → ' + op.exp + ' kWh',
+          prevSindOpEquil: 'Compensa (retorno em 8 anos) com o kWh instalado abaixo de ' + op.equilibrio + '.',
+          prevSindPremissasAberto: !!s.prevSindPremissas,
+          prevSindPremissasLink: s.prevSindPremissas ? 'Ocultar premissas' : 'Ver premissas',
+          prevSindPremissasToggle: () => this.setState(p => ({ prevSindPremissas: !p.prevSindPremissas })),
+          prevSindPremissa: an.premissa.replace(/^Premissas: /, ''),
+          prevSindPerguntar: () => { this.setState({ screen: 'sindico', tab: 'sindico' }); this.ask('Vale a pena ampliar a bateria?'); },
+        };
+      })(),
+      // load-shifting do dia
+      prevLsVisivel: !!LS,
+      prevLsNenhum: !LS,
+      prevLsTitulo: LS ? 'Economia estimada de ' + BRL0(B.custo - LS.depois.custo) + ' no dia' : '',
+      prevLsAntesDepois: LS ? 'Rede na ponta: ' + kwh(B.redePonta) + ' → ' + kwh(LS.depois.redePonta) + ' kWh · custo ' + BRL0(B.custo) + ' → ' + BRL0(LS.depois.custo) : '',
+      prevLsRecs: LS ? LS.recs.map(r => ({
+        titulo: r.titulo, texto: r.texto, de: r.de, para: r.para, kwh: v(r.kwh, 0) + ' kWh', econ: BRL0(r.econ) + '/dia',
+      })) : [],
+      prevLsBotao: progDia ? '✓ Plano programado' : 'Programar este plano',
+      prevLsBotaoBg: progDia ? 'rgba(0,209,255,.16)' : 'rgba(255,255,255,.12)', prevLsBotaoFg: progDia ? '#7fd9f2' : '#f2f6fb',
+      prevLsProgramar: () => {
+        if (!LS) return;
+        this.setState(p => ({ prevShiftProg: { ...(p.prevShiftProg || {}), [d]: true } }));
+        this.say('Load-shifting programado para ' + rot.longo + ' ' + rot.data + ': ' + LS.recs.map(r => r.titulo.toLowerCase() + ' (' + Math.round(r.kwh) + ' kWh, ' + r.de + ' → ' + r.para + ')').join('; ') + '.');
+      },
+      prevLsMotivo: (() => {
+        if (LS) return '';
+        const motivos = [];
+        if (B.soc17 >= D.bessKwh * 0.95) motivos.push('a sobra de sol já enche a bateria antes da ponta, então comprar da rede de madrugada não economiza');
+        if (B.exp < 3) motivos.push('quase não sobra sol para receber carga deslocada da ponta');
+        else motivos.push('deslocar carga da ponta para as horas de sol economizaria menos de R$ 3 no dia');
+        return 'Não é recomendado para este dia: ' + motivos.join('; ') + '.';
+      })(),
+      ...(() => {
+        const pf = MLPrev.perfilDia(d, cen);
+        return { prevPerfil: pf ? pf.nome : '', prevPerfilAcao: pf ? pf.acao : '', prevPerfilVisivel: !!pf };
+      })(),
+      prevDiaNota: (cal.nome_feriado ? cal.nome_feriado + ' · ' : '') + 'dois Random Forest, um para cada consumidor',
+      prevSimChip: simulando ? 'Cenário simulado · ' + sinal(B.need - MLPrev.balanco(d, cenBase).need) : '',
+      prevSimVisivel: simulando,
+      prevClima: icone(clima) + ' máx ' + v(Math.max(...clima.temperatura)) + ' °C · mín ' + v(Math.min(...clima.temperatura)) + ' °C · '
+        + v(clima.irradiancia.reduce((a, b) => a + b, 0) / 1000) + ' kWh/m² de sol · ' + (chuvaDia > 0.4 ? v(chuvaDia) + ' mm de chuva' : 'sem chuva'),
+      prevClimaFonte: 'Open-Meteo, emitida em ' + D.futuro.emitidaEm.slice(8, 10) + '/' + D.futuro.emitidaEm.slice(5, 7) + ' às ' + D.futuro.emitidaEm.slice(11, 13) + 'h'
+        + (s.prevTemp ? ' · ' + (s.prevTemp > 0 ? '+' : '−') + Math.abs(s.prevTemp) + ' °C simulados' : ''),
+      prevFatores: fx.map(f => {
+        const id = f.onde + f.k, ab = s.prevFatorAb === id;
+        const ev = f.onde === 'Eletroposto';
+        const tot = ev ? B.ev : B.gal;
+        const mais = f.kwh >= 0, q = v(Math.abs(f.kwh)) + ' kWh', pc = tot > 0 ? Math.round(Math.abs(f.kwh) / tot * 100) : 0;
+        const tmax = Math.max(...clima.temperatura), tN = Math.max(...D.normais.temperatura);
+        const irr = clima.irradiancia.reduce((a, b) => a + b, 0) / 1000, irrN = D.normais.irradiancia.reduce((a, b) => a + b, 0) / 1000;
+        const quem = ev ? 'as vagas' : 'a galeria';
+        const efeito = (mais ? 'O modelo prevê ' + q + ' a mais' : 'O modelo prevê ' + q + ' a menos') + ' para ' + quem + ' (' + pc + '% do dia) por causa disso.';
+        const o = {
+          temp: [(tmax < tN ? 'Hoje vai fazer menos calor que o normal de outubro' : 'Hoje vai fazer mais calor que o normal de outubro') + ': máxima de ' + v(tmax) + ' °C, contra ' + Math.round(tN) + ' °C típicos.',
+            tmax < tN ? 'Com menos calor, a climatização central liga menos estágios de compressor.' : 'Com mais calor, a climatização central liga mais estágios de compressor e trabalha mais horas.'],
+          sol: [(irr < irrN ? 'Hoje o céu deve estar mais encoberto que o normal' : 'Hoje o sol deve estar mais forte que o normal') + ': ' + v(irr) + ' kWh/m², contra ' + v(irrN) + ' típicos.',
+            'O sol que bate no prédio aquece o ar interno e aumenta o trabalho da climatização.'],
+          chuva: ['Previsão de chuva no horário comercial.', 'Com chuva, o movimento da galeria muda e a climatização trabalha menos.'],
+          cal: [cal.feriado ? 'Feriado (' + [cal.nome_feriado, cal.data_comercial].filter(Boolean).join(' · ') + '): a galeria abre só das ' + cal.abre + 'h às ' + cal.fecha + 'h, em vez de 10h às 22h.' : 'Data especial no calendário: ' + [cal.data_comercial].filter(Boolean).join('') + '.',
+            ev ? 'Com menos horas abertas, há menos tempo para os motoristas recarregarem.' : 'Menos horas abertas significam menos horas de iluminação, escadas rolantes e climatização.'],
+          dow: ['Cada dia da semana tem um movimento próprio. ' + rot.longo.replace(/^./, c => c.toUpperCase()) + ' fica ' + (mais ? 'acima' : 'abaixo') + ' da média dos 7 dias.',
+            ev ? 'O sábado é o dia de mais recarga; segunda a quinta costumam ser os mais fracos.' : 'O movimento da galeria muda ao longo da semana e o modelo aprendeu esse padrão com o histórico.'],
+          clima: ['Clima do dia: máxima de ' + v(tmax) + ' °C e ' + v(irr) + ' kWh/m² de sol, contra ' + Math.round(tN) + ' °C e ' + v(irrN) + ' típicos.',
+            'Em dias quentes e de sol, mais gente vai ao shopping climatizado e o desconto solar da tarifa atrai recargas; em dias amenos, menos.'],
+          vagas: ['Uma vaga está fora de operação.', 'Com menos vagas, parte de quem chega encontra o eletroposto cheio e vai embora.'],
+        }[f.k] || [f.det, ''];
+        return {
+          onde: f.onde, label: f.label, det: f.det, valor: sinal(f.kwh),
+          cor: f.kwh >= 0 ? '#0f7a51' : '#c01b28', barra: (Math.abs(f.kwh) / maxFx * 100).toFixed(0) + '%',
+          barraCor: f.kwh >= 0 ? '#9ddcc0' : '#f3b3b9',
+          aberto: ab, seta: ab ? '⌃' : '⌄', bg: ab ? '#fff' : 'transparent', borda: ab ? '#e4e5e9' : 'transparent',
+          oQue: o[0], porQue: o[1], efeito,
+          // gráfico: previsão com o fator × sem o fator, hora a hora
+          ...(() => {
+            if (!ab || !f.alt) return { grafFator: [], grafVis: false };
+            const com = (ev ? B.linhas.map(x => x.ev) : B.linhas.map(x => x.gal));
+            const dif = com.map((x, h) => x - f.alt[h]);
+            const iMax = dif.reduce((a, x, h) => (Math.abs(x) > Math.abs(dif[a]) ? h : a), 0);
+            const hs = dif.map((x, h) => (Math.abs(x) >= Math.abs(dif[iMax]) * 0.5 ? h : -1)).filter(h => h >= 0);
+            const hh = (h) => String(h).padStart(2, '0') + 'h';
+            return {
+              grafVis: true,
+              grafFator: this.grafLinhas({ H: 120, topo: 24, base: 104,
+                series: [{ vals: com, cor: f.kwh >= 0 ? '#0f7a51' : '#d31e2c' }, { vals: f.alt, cor: '#9aa1ad', pontilhada: true }],
+                destaque: { serie: 0, i: iMax, texto: hh(iMax) + ' · ' + (dif[iMax] >= 0 ? '+' : '−') + v(Math.abs(dif[iMax])) + ' kWh' } }),
+              grafLegCom: ({ temp: 'com a temperatura prevista', sol: 'com o sol previsto', chuva: 'com a chuva prevista', clima: 'com o clima previsto',
+                cal: cal.feriado ? 'com o feriado' : 'com a data especial', dow: 'neste dia da semana', vagas: 'com a vaga parada' })[f.k] || 'com o fator', grafLegSem: f.k === 'dow' ? 'média dos 7 dias' : f.k === 'cal' ? 'num dia comum' : f.k === 'vagas' ? 'com 4 vagas' : 'no normal de outubro',
+              grafOnde: 'O efeito se concentra ' + (hs.length > 1 ? 'das ' + hh(hs[0]) + ' às ' + hh(hs[hs.length - 1] + 1) : 'às ' + hh(iMax)) + '.',
+            };
+          })(),
+          comoCalc: 'Como calculamos: o app roda o modelo de novo trocando só ' + (f.k === 'dow' ? 'o dia da semana pela média dos 7 dias' : f.k === 'cal' ? 'o feriado por um dia comum' : f.k === 'vagas' ? 'a vaga parada por uma vaga operando' : 'este fator pelo normal de outubro') + '; a diferença entre as duas previsões é o número ao lado.',
+          onPick: () => this.setState(p => ({ prevFatorAb: p.prevFatorAb === id ? null : id })),
+        };
+      }),
+      prevFatoresVazio: fx.length === 0,
+      prevPorQueAberto: !!s.prevPorQue,
+      prevPorQueBtn: s.prevPorQue ? 'Recolher ⌃' : 'Expandir ⌄',
+      prevPorQueSub: fx.length ? fx.length + (fx.length > 1 ? ' fatores' : ' fator') + ' mudam a previsão de hoje · o maior: ' + fx[0].label.toLowerCase() + ' (' + sinal(fx[0].kwh) + ')' : 'dia típico: nenhum fator relevante',
+      prevPorQueToggle: () => this.setState(p => ({ prevPorQue: !p.prevPorQue })),
+      prevFatoresNota: 'Toque em um fator para ver a explicação. Cada efeito é calculado separadamente pelo próprio modelo, sem regra fixa, por isso os números não se somam exatamente.',
+      prevRedePico: v(pr.rede) + ' kW',
+      prevRedeNota: 'às ' + pr.h + 'h · galeria ' + v(pr.gal) + ' + vagas ' + v(pr.ev) + ' − solar ' + v(pr.sol) + ' − bateria ' + v(pr.bess) + ' kW',
+      prevRedePct: Math.round(pctTeto * 100) + '% do teto',
+      prevRedeBarra: Math.min(100, pctTeto * 100).toFixed(0) + '%',
+      prevRedeCor: pctTeto > 1 ? '#f5333f' : pctTeto > 0.9 ? '#b97a08' : '#149d68',
+      prevRedeChipBg: pctTeto > 1 ? '#fdeaec' : pctTeto > 0.9 ? '#faeed3' : '#dcf3ea',
+      prevRedeChipFg: pctTeto > 1 ? '#a3111c' : pctTeto > 0.9 ? '#7a5406' : '#0f5c3f',
+      prevTetoTxt: 'Teto operacional ' + v(MLPrev.LIMITE) + ' kW (55 kW contratados − 12%)',
+      prevNivelTxt: (() => {
+        if (!D.nivelPrevisto || cen.vagas !== D.vagasNaPrevisao || s.prevTemp) return 'Classificador do nível de demanda: disponível só no cenário real.';
+        const n = MLPrev.nivelHoras(d);
+        return 'Classificador (Random Forest): ' + n.Alta + ' h de demanda Alta e ' + n['Média'] + ' h de Média previstas no dia.';
+      })(),
+      // ---- semana
+      prevSemTotal: kwh(totSem) + ' kWh',
+      prevSemDemandas: (() => {
+        const card = (alvo, nome, ico, det) => {
+          const vals = semana.map(x => (alvo === 'ev' ? x.e : x.g));
+          const tot = vals.reduce((a, b) => a + b, 0), iv = MLPrev.iv(alvo).semana_q80_rel;
+          const ms = medSemanas(D.historico[alvo === 'ev' ? 'ev' : 'galeria']);
+          const iMax = vals.reduce((a, x, i) => (x > vals[a] ? i : a), 0);
+          return {
+            nome, ico, det, valor: kwh(tot), un: 'kWh',
+            faixa: kwh(tot * (1 - iv)) + '–' + kwh(tot * (1 + iv)) + ' kWh',
+            pico: 'maior dia: ' + semana[iMax].r.curto.toLowerCase() + ' ' + semana[iMax].r.num + ' · ' + kwh(vals[iMax]) + ' kWh',
+            ...pillComp(tot, ms.med),
+            ref: ms.med == null ? '' : 'mediana das ' + ms.n + ' últimas semanas: ' + kwh(ms.med) + ' kWh',
+          };
+        };
+        return [card('galeria', 'Galeria', '🏬', 'condomínio · 7 dias'), card('ev', 'Eletroposto', '⚡', cen.vagas + ' vagas · 7 dias')];
+      })(),
+      prevSemTotalTxt: (() => { const m = medSemanas(D.historico.ev.map((x, i) => (x == null || D.historico.galeria[i] == null ? null : x + D.historico.galeria[i])));
+        return 'Total do prédio: ' + kwh(totSem) + ' kWh' + (m.med ? ' · mediana das últimas semanas: ' + kwh(m.med) + ' kWh' : ''); })(),
+      prevSemFaixa: 'galeria ' + kwh(SW('gal')) + ' + eletroposto ' + kwh(SW('ev')) + ' kWh · ±' + kwh(faixaNeed(SW('gal'), SW('ev'), 'semana_q80_rel'))
+        + ' · semana passada medida: ' + kwh(semPassada) + ' kWh (' + (totSem >= semPassada ? '+' : '−') + v(Math.abs(totSem / semPassada - 1) * 100, 0) + '%)',
+      prevSemConsumidores: this.blocosConsumidor(this.porConsumidor(semana.flatMap(x => x.b.linhas)), { gal: 'condomínio · 7 dias', ev: 'recarga dos carros · 7 dias' }),
+      prevSemFontes: this.fontesUI([
+        { ico: '☀️', label: 'Solar', kwh: kwh(SW('solUso')) + ' kWh', pct: pct(SW('solUso'), totSem), barra: pct(SW('solUso'), totSem), cor: COR.sol, det: 'de ' + kwh(SW('sol')) + ' kWh gerados · ' + kwh(SW('exp')) + ' exportados' },
+        { ico: '🔋', label: 'Bateria', kwh: kwh(SW('bat')) + ' kWh', pct: pct(SW('bat'), totSem), barra: pct(SW('bat'), totSem), cor: COR.bat, det: 'na ponta, carregada com sobra solar' },
+        { ico: '🔌', label: 'Rede', kwh: kwh(SW('rede')) + ' kWh', pct: pct(SW('rede') - SW('compra'), totSem), barra: pct(SW('rede') - SW('compra'), totSem), cor: COR.rede, det: kwh(SW('redePonta')) + ' kWh na ponta · ' + BRL0(SW('custo')) + ' estimados' },
+      ]),
+      prevSemTitulo: (() => { const t = SW('need'); return Math.round((SW('solUso') + SW('bat')) / t * 100) + '% da energia da semana vem do sol e da bateria'; })(),
+      prevSemSub: 'O restante, ' + kwh(SW('rede')) + ' kWh, vem da rede da Enel · gasto previsto de R$ ' + Math.round(SW('custo')).toLocaleString('pt-BR'),
+      prevSemArm: (() => {
+        const so = SW('solBat') + SW('exp');
+        const cheias = semana.filter(x => x.b.cheiaAs != null).length;
+        return so > 0.5 ? '🔋 As baterias enchem com o sol em ' + cheias + ' dos ' + nD + ' dias e devolvem a energia no fim da tarde.' + (SW('exp') > 1 ? ' ' + kwh(SW('exp')) + ' kWh de sol que sobram vão para a rede.' : '') : '';
+      })(),
+      prevSemShift: econSem > 0
+        ? '⇄ Load-shifting recomendado em ' + semana.filter(x => x.ls.length).length + ' dos ' + nD + ' dias: economia estimada de ' + BRL0(econSem) + ' na semana. Toque no dia para ver o plano.'
+        : 'Nenhum dia da semana pede load-shifting.',
+      ...(() => {
+        const ser = [
+          { vals: semana.map(x => x.b.need), cor: '#d31e2c', area: true, nome: 'Necessária' },
+          { vals: semana.map(x => x.b.solUso + x.b.bat), cor: '#e9a000', pontilhada: true, nome: 'Solar + bateria' },
+          { vals: semana.map(x => x.b.rede), cor: '#0f2a47', pontilhada: true, nome: 'Da rede' },
+        ];
+        const iMax = ser[0].vals.reduce((a, val, i, arr) => (val > arr[a] ? i : a), 0);
+        return {
+          prevGS: this.grafLinhas({ series: ser, topo: 34, destaque: { serie: 0, i: iMax, texto: semana[iMax].r.curto + ' ' + semana[iMax].r.num + ' · ' + kwh(ser[0].vals[iMax]) + ' kWh' } }),
+          prevSemLegendaSer: ser.map(x => ({ label: x.nome, cor: x.cor, estilo: x.pontilhada ? 'dotted' : 'solid' })),
+          prevSemDias: semana.map((x, k) => ({
+            left: this.grafLinhas({ series: [{ vals: semana.map(() => 1) }] })[0].xs[k],
+            label: x.r.rel === 'Hoje' ? 'Hoje' : x.r.curto, marca: x.ls.length ? '⇄' : '',
+            bg: x.r.rel === 'Hoje' ? '#d31e2c' : 'transparent', fg: x.r.rel === 'Hoje' ? '#fff' : '#7c8494',
+            onPick: () => this.setState({ prevModo: 'dia', prevDia: x.i }),
+          })),
+          ...(() => { const m = medSemanas(D.historico.ev.map((x, i) => (x == null || D.historico.galeria[i] == null ? null : x + D.historico.galeria[i]))).med || semPassada;
+            return { prevSemPill: (totSem >= m ? '+' : '−') + v(Math.abs(totSem / m - 1) * 100, 1) + '%',
+              prevSemPillBg: totSem >= m ? '#fdeaec' : '#dcf3ea', prevSemPillFg: totSem >= m ? '#a3111c' : '#0f5c3f' }; })(),
+        };
+      })(),
+      prevSemLinhas: semana.map(x => ({
+        dia: (x.r.rel ? x.r.rel + ' · ' : '') + x.r.curto + ' ' + x.r.data,
+        clima: icone(x.clima) + ' ' + v(Math.max(...x.clima.temperatura), 0) + '°',
+        tag: x.ls.length ? '⇄ shift ' + BRL0(x.econ) : x.cal.nome_feriado ? 'Feriado' : x.cal.data_comercial ? 'Data comercial' : x.cal.dia_semana >= 5 ? 'Fim de semana' : '',
+        tagVis: x.ls.length || x.cal.nome_feriado || x.cal.data_comercial || x.cal.dia_semana >= 5 ? 'inline-block' : 'none',
+        tagBg: x.ls.length ? '#dcf3ea' : x.cal.nome_feriado ? '#e0f7fc' : '#eceef2', tagFg: x.ls.length ? '#0f5c3f' : x.cal.nome_feriado ? '#006b85' : '#5d6572',
+        need: kwh(x.b.need), sub: kwh(x.g) + ' + ' + kwh(x.e),
+        renov: kwh(x.b.solUso + x.b.bat), rede: kwh(x.b.rede),
+        onPick: () => this.setState({ prevModo: 'dia', prevDia: x.i }),
+      })),
+      prevSemLegenda: 'kWh por dia · ⇄ = load-shifting recomendado · toque no dia para abrir o plano',
+      // ---- alertas
+      prevAlertas: alertas.map(a => ({
+        titulo: a.titulo, quando: a.quando, resumo: a.resumo, acao: a.acao, botao: a.botao + ' ›',
+        aberto: s.prevAlertaAb === a.id, seta: s.prevAlertaAb === a.id ? '⌃' : '⌄',
+        onToggle: () => this.setState(p => ({ prevAlertaAb: p.prevAlertaAb === a.id ? null : a.id })),
+        cor: this.SEV[a.sev].cor, tagBg: this.SEV[a.sev].tagBg, tagFg: this.SEV[a.sev].tagFg, sevLabel: this.SEV[a.sev].label,
+        onPick: () => this.acaoAlertaML(a),
+      })),
+      prevAlertasVazio: alertas.length === 0,
+      prevAlertasSub: alertas.length ? alertas.length + (alertas.length > 1 ? ' alertas' : ' alerta') + ' para os próximos ' + nD + ' dias' : 'nenhum alerta para os próximos ' + nD + ' dias',
+      // ---- cenário (o que acontece se…)
+      prevTempTxt: (s.prevTemp > 0 ? '+' : s.prevTemp < 0 ? '−' : '') + Math.abs(s.prevTemp || 0) + ' °C',
+      prevTempMenos: () => this.setState(p => ({ prevTemp: Math.max(-5, (p.prevTemp || 0) - 1) })),
+      prevTempMais: () => this.setState(p => ({ prevTemp: Math.min(5, (p.prevTemp || 0) + 1) })),
+      prevVagasTxt: cen.vagas + ' de 4 vagas',
+      prevVagasNota: vagasReais < 4 ? (s.prevVagasSim === 4 ? 'simulando a Vaga 03 reparada' : 'Vaga 03 em falha agora') : 'todas operando agora',
+      prevVagasBtn: vagasReais < 4 ? (s.prevVagasSim === 4 ? 'Voltar ao estado real' : 'Simular 4 vagas') : (s.prevVagasSim === 3 ? 'Voltar ao estado real' : 'Simular 1 vaga parada'),
+      prevVagasToggle: () => this.setState(p => ({ prevVagasSim: p.prevVagasSim != null ? null : (vagasReais < 4 ? 4 : 3) })),
+      prevCenarioReset: () => this.setState({ prevTemp: 0, prevVagasSim: null }),
+      prevCenarioNota: simulando
+        ? 'No cenário, ' + rot.longo + ' fica com ' + sinal(MLPrev.preverDia('ev', d, cen).total - MLPrev.preverDia('ev', d, cenBase).total) + ' nas vagas e '
+          + sinal(MLPrev.preverDia('galeria', d, cen).total - MLPrev.preverDia('galeria', d, cenBase).total) + ' na galeria.'
+        : 'Mude a temperatura ou as vagas para ver o modelo recalcular aqui mesmo, sem servidor.',
+      // ---- como o modelo foi avaliado
+      prevMetDia: v(mDia.erro_dia_pct) + '%', prevMetDiaBase: v(mBase.erro_dia_pct) + '%',
+      prevMetSem: v(mDia.erro_semana_pct) + '%', prevMetSemBase: v(mBase.erro_semana_pct) + '%',
+      prevMetFeriadoLabel: 'R² por hora',
+      prevMetFeriado: v(mDia.r2_hora, alvo === 'ev' ? 2 : 3) + ' vs ' + v(mBase.r2_hora, alvo === 'ev' ? 2 : 3),
+      prevMetNota: alvo === 'ev'
+        ? 'Com cerca de ' + Math.round(D.sessoesDia) + ' sessões por dia, o acaso das chegadas domina. O Random Forest prevê o formato do dia (hora, dia da semana, clima e calendário) em relação ao nível recente e explica ' + v(mDia.r2_hora * 100, 0) + '% da variação hora a hora (R² ' + v(mDia.r2_hora, 2) + ', contra ' + v(mBase.r2_hora, 2) + ' da média simples). No total de um dia erra ' + v(mDia.erro_dia_pct, 0) + '%; na soma da semana, a média simples das 4 semanas ainda é melhor (' + v(mBase.erro_semana_pct, 0) + '% contra ' + v(mDia.erro_semana_pct, 0) + '%).'
+        : 'O consumo da edificação é dominado pelo horário de funcionamento e pela temperatura. O Random Forest explica ' + v(mDia.r2_hora * 100, 0) + '% da variação hora a hora (R² ' + v(mDia.r2_hora, 3) + ') e erra ' + v(mDia.erro_dia_pct) + '% no total do dia, contra ' + v(mBase.erro_dia_pct) + '% da média das 4 semanas.',
+      ...(() => {
+        const n = bt.datas.length, ult = n - 1;
+        const erro = Math.abs(bt.previsto[ult] - bt.real[ult]) / Math.max(1, bt.real[ult]) * 100;
+        return {
+          prevGB: this.grafLinhas({ H: 130, topo: 34, base: 112, minY: Math.min(...bt.real, ...bt.previsto) * 0.85,
+            series: [{ vals: bt.real, cor: '#0f2a47', area: true, nome: 'Medido' }, { vals: bt.previsto, cor: '#d31e2c', pontilhada: true, nome: 'Previsto' }],
+            destaque: { serie: 1, i: ult, texto: 'previsto ' + kwh(bt.previsto[ult]) + ' · medido ' + kwh(bt.real[ult]) } }),
+          prevBtLbl: [bt.datas[0], bt.datas[Math.round(ult / 2)], bt.datas[ult]].map(dt => dt.slice(8, 10) + '/' + dt.slice(5, 7)),
+          prevBtPill: 'erro no dia ' + v(mDia.erro_dia_pct) + '%',
+        };
+      })(),
+      prevImportancia: imp.map(([k, val]) => ({ label: k, pct: v(val, val < 10 ? 1 : 0) + '%', barra: Math.max(2, val / imp[0][1] * 100).toFixed(0) + '%' })),
+      prevModeloRodape: 'Random Forest (scikit-learn) com ' + D.modelos[alvo].n_arvores + ' árvores de profundidade até ' + D.modelos[alvo].profundidade_max + ', treinado com '
+        + D.modelos[alvo].n_treino.toLocaleString('pt-BR') + ' horas de MeterValues OCPP e smart meter GoodWe (jan/2025 a out/2026, base simulada). Avaliação como na aula: divisão temporal 80/20, sem embaralhar ('
+        + met.avaliacao.replace('divisão temporal 80/20 ', '') + '). Comparado com Regressão Linear e KNN no notebook inteligencia/ChargeGrid_ML.ipynb. A inferência roda no app.',
+      // ---- card do Início
+      dashPrevQuando: (MLPrev.rotuloDia(0).rel || MLPrev.rotuloDia(0).curto) + ' · ' + MLPrev.rotuloDia(0).data,
+      ...(() => {
+        const b0 = MLPrev.balanco(0, cenBase);
+        return {
+          dashPrevNeed: kwh(b0.need) + ' kWh',
+          dashPrevNeedSub: 'galeria ' + kwh(b0.gal) + ' + vagas ' + kwh(b0.ev),
+          dashPrevRede: kwh(b0.rede) + ' kWh',
+          dashPrevRedeSub: pct(b0.solUso + b0.bat, b0.need) + ' solar',
+        };
+      })(),
+      dashPrevAlerta: alertas.length ? alertas[0].titulo : 'Nenhum alerta para a semana',
+      dashPrevAlertaCor: alertas.length && alertas[0].sev !== 'info' ? '#ffd27a' : '#9dff33',
+      dashPrevAlertaIco: alertas.length && alertas[0].sev !== 'info' ? '⚠' : '✓',
+      dashPrevNAlertas: alertas.length > 1 ? '+' + (alertas.length - 1) : '',
+      dashPrevAlertasN: alertas.length ? alertas.length + (alertas.length > 1 ? ' alertas' : ' alerta') : 'sem alertas',
+      // ---- Síndico: abertura com a previsão
+      sindicoPrevLinha: 'Previsão para ' + (MLPrev.rotuloDia(0).rel ? MLPrev.rotuloDia(0).rel.toLowerCase() : MLPrev.rotuloDia(0).longo) + ': '
+        + kwh(evHoje.total + galHoje.total) + ' kWh necessários (' + kwh(galHoje.total) + ' na galeria e ' + kwh(evHoje.total) + ' nas vagas), '
+        + kwh(MLPrev.balanco(0, cenBase).rede) + ' kWh vindos da rede.'
+        + (alertas.filter(a => a.sev !== 'info').length ? ' Atenção: ' + alertas.filter(a => a.sev !== 'info').map(a => a.titulo.charAt(0).toLowerCase() + a.titulo.slice(1)).join('; ') + '.' : ''),
+    };
+  };
+
+  // endpoint da Edge Function supabase/functions/assistente (prop iaModo = api)
+  IA_ENDPOINT = 'https://nnxcuagbvgfuuxmozvcd.supabase.co/functions/v1/assistente';
+  // chave pública (anon) do projeto Supabase: pode ficar no app; a service_role e a chave da OpenAI nunca
+  IA_ANON_KEY = '<anon-key>';
+
+  // números que as ferramentas do agente consultam (o LLM não inventa nenhum)
+  snapshotIA = (papel) => {
+    const s = this.state;
+    if (papel === 'sindico') {
+      const site = s.siteSel || 'pn';
+      const cs = s.chargers.filter(c => c.site === site);
+      const dlm = this.dlmAgora();
+      const dia = cs.reduce((t, c) => t + (c.hoje || 0) * (c.preco || 0), 0);
+      return SnapshotIA.sindico(MLPrev, this.cenarioML(), {
+        vagas: cs.map(c => ({ vaga: c.nome, status: c.status, kw: c.kw || 0, kwh_hoje: c.hoje || 0, erro: c.erro || null })),
+        dlm: { contratada_kw: dlm.contratada, teto_vagas_kw: dlm.teto, por_vaga_kw: dlm.porVaga, vagas_em_carga: dlm.n },
+        tarifa: { base_rs_kwh: (s.baseSites || {})[site] ?? 2.49, fator_alfa: Math.round(this.alfa() * 100) / 100, horario_ponta_ativo: !!s.ponta, ceu: this.solarTexto() },
+        hoje: { sessoes: cs.filter(c => (c.hoje || 0) > 0).length, kwh_entregues: Math.round(cs.reduce((t, c) => t + (c.hoje || 0), 0) * 10) / 10, faturado_rs: Math.round(dia * 100) / 100, vagas_carregando: cs.filter(c => c.status === 'carregando').length, vagas_em_falha: cs.filter(c => c.status === 'falha').map(c => c.nome) },
+        faturamento: { hoje_bruto_rs: Math.round(dia * 100) / 100, mes_bruto_rs: Math.round(dia * 26), taxa_plataforma: '10%', mes_repasse_rs: Math.round(dia * 26 * 0.9), kwh_hoje: Math.round(cs.reduce((t, c) => t + (c.hoje || 0), 0) * 10) / 10 },
+      });
+    }
+    return SnapshotIA.motorista({
+      bateria_pct: s.pctIni, capacidade_kwh: this.cap(), potencia_kw: 7, preco_casa_rs_kwh: s.precoAnf,
+      eletropostos: SPOTS.map(p => ({ nome: p.nome, distancia: p.dist, tempo_ate_la: p.eta, vagas_livres: p.livres, vagas: p.vagas, status: p.status, tarifa_rs_kwh: p.preco })),
+      pagamento: { metodos: ['Pix', 'cartão', 'créditos da carteira'], saldo_creditos_rs: s.saldo, pre_autorizacao: 'cartão reserva a estimativa e captura só os kWh entregues; Pix cobra a estimativa e estorna a sobra na hora', ociosidade: { tolerancia_min: 10, rs_por_min: 0.9 } },
+      historico_mes: { kwh: 125.7, gasto_eletropostos_rs: 55.44, recargas_eletroposto: 2, recargas_casa: 4 },
+    });
+  };
+
+  // envia a pergunta ao assistente (Edge Function ou regras locais) e mostra "digitando"
+  perguntarIA = (papel, chave, campo, q, local) => {
+    AssistenteIA.configurar({ modo: this.props.iaModo === 'api' ? 'api' : 'sandbox', endpoint: this.IA_ENDPOINT, token: this.IA_ANON_KEY });
+    const pend = { who: 'ai', text: '•••', pend: true };
+    this.setState(p => ({ [chave]: [...p[chave], { who: 'me', text: q }, pend], [campo]: '' }));
+    AssistenteIA.perguntar({ papel, pergunta: q, snapshot: this.snapshotIA(papel), local }).then(r => {
+      const meta = r.origem === 'api'
+        ? 'IA' + (r.ferramentas && r.ferramentas.length ? ' · consultou ' + Array.from(new Set(r.ferramentas)).map(f => f.replace(/^consultar_|^avaliar_|^estimar_/, '').replace(/_/g, ' ')).join(', ') : '') + (r.fontes && r.fontes.length ? ' · ' + r.fontes.length + ' documento(s)' : '')
+        : (r.aviso || '');
+      this.setState(p => ({ [chave]: p[chave].filter(m => m !== pend).concat({ who: 'ai', text: r.resposta, meta }) }));
+    });
   };
 
   askIA = (q) => {
@@ -96,9 +1043,7 @@ class Component extends DCLogic {
       if (/hist[óo]rico|gastei|m[êe]s/.test(x)) return 'Seu histórico completo, separado por eletroposto e casa, fica na aba Carga. Este mês você recarregou principalmente à noite em casa.';
       return 'Posso ajudar com preço, rota, tempo de recarga, taxa de ociosidade e histórico. Tente perguntar, por exemplo, "quanto custa completar?".';
     };
-    const resp = respostas[q] || livre(q);
-    this.setState(p => ({ chatIA: [...p.chatIA, { who: 'me', text: q }], perguntaIA: '' }));
-    setTimeout(() => this.setState(p => ({ chatIA: [...p.chatIA, { who: 'ai', text: resp }] })), 500);
+    this.perguntarIA('motorista', 'chatIA', 'perguntaIA', q, () => respostas[q] || livre(q));
   };
 
   agoraFmt = () => {
@@ -157,17 +1102,23 @@ class Component extends DCLogic {
   };
 
   tick = () => {
-    const speed = this.props.velocidadeDemo ?? 60;
+    // a recarga inteira, qualquer que seja a meta, dura ~duracaoDemo segundos
+    // reais na demonstração — a banca não espera as horas da carga simulada
+    const dur = this.props.duracaoDemo ?? 10;
     this.setState(p => {
       if (!p.sess) return {};
+      const speed = (p.sess.metaKwh / KW) * 3600 / dur;
       const dt = speed / 3600;
       const kwh = Math.min(p.sess.kwh + KW * dt, p.sess.metaKwh);
       const elapsed = p.sess.elapsed + speed;
       const done = kwh >= p.sess.metaKwh - 0.001;
       if (done) clearInterval(this._iv);
       return { sess: { ...p.sess, kwh, elapsed }, running: !done };
-    });
+    }, () => { if (!this.state.running) this.hwSet('disponivel'); });
   };
+
+  // endpoint da Edge Function supabase/functions/pagamentos (modo "api")
+  PAG_ENDPOINT = 'https://nnxcuagbvgfuuxmozvcd.supabase.co/functions/v1/pagamentos';
 
   startSession = () => {
     const s = this.spot();
@@ -176,12 +1127,72 @@ class Component extends DCLogic {
       this.say('Defina uma meta acima dos ' + this.state.pctIni + '% atuais para liberar a carga.');
       return;
     }
+    // com o carregador físico na mesa (e respondendo), o cabo precisa estar no carro
+    if (this.props.hardwareFisico !== false && this.state.hwOnline && !this.state.plugged) {
+      this.say('Conecte o cabo no carro — aperte o botão do carregador — para liberar a carga.');
+      return;
+    }
+    if (this.state.pay && (this.state.pay.fase === 'autorizando' || this.state.pay.fase === 'pix')) return;
+    // 1) pré-autoriza na API de pagamento; 2) só então libera a energia
+    Pagamentos.configurar({ modo: this.props.pagamentoModo === 'api' ? 'api' : 'sandbox', endpoint: this.PAG_ENDPOINT, token: this.IA_ANON_KEY });
+    const metodo = this.state.method || 'pix';
+    const valor = Math.round(meta * s.preco * 100) / 100;
+    this.setState({ pay: { fase: 'autorizando', metodo, valor } });
+    Pagamentos.autorizar({ metodo, valor, saldo: this.state.saldo })
+      .then(r => {
+        if (r.status === 'pending' && r.pix) {
+          this.setState({ pay: { fase: 'pix', metodo, valor, id: r.id, pix: r.pix } });
+          this.esperarPix(r.id, meta, s);
+        } else {
+          this.iniciarCarga(meta, s, r);
+        }
+      })
+      .catch(e => { this.setState({ pay: { fase: 'erro', metodo, valor, erro: e.message } }); this.say(e.message); });
+  };
+
+  esperarPix = (id, meta, s) => {
+    clearInterval(this._pixIv);
+    this._pixIv = setInterval(() => {
+      if (!this.state.pay || this.state.pay.id !== id) { clearInterval(this._pixIv); return; }
+      Pagamentos.consultar(id).then(r => {
+        if (r.status === 'approved') { clearInterval(this._pixIv); this.say('Pix aprovado. Carga liberada.'); this.iniciarCarga(meta, s, r); }
+      }).catch(() => {});
+    }, 1000);
+  };
+
+  cancelarPagamento = () => {
+    const p = this.state.pay;
+    clearInterval(this._pixIv);
+    if (p && p.id) Pagamentos.cancelar(p.id).catch(() => {});
+    this.setState({ pay: null });
+  };
+
+  iniciarCarga = (meta, s, autorizacao) => {
     this.setState({
-      sess: { kwh: 0, elapsed: 0, tarifa: s.preco, metaKwh: meta, preauth: meta * s.preco, spot: s.nome },
-      running: true, screen: 'live', tab: 'carga', receipt: null, stars: 0,
+      pay: null,
+      sess: { kwh: 0, elapsed: 0, tarifa: s.preco, metaKwh: meta, preauth: autorizacao.valor_autorizado, spot: s.nome, pagId: autorizacao.id, pagStatus: autorizacao.status_detail },
+      running: true, interrupted: false, screen: 'live', tab: 'carga', receipt: null, stars: 0,
     });
     clearInterval(this._iv);
     this._iv = setInterval(this.tick, 1000);
+    this.hwSet('carregando');
+  };
+
+  // plugue desconectado no meio da carga: pausa a medição, não cobra nada a
+  // mais e deixa o motorista escolher entre reconectar ou encerrar de vez
+  interruptSession = () => {
+    if (!this.state.running) return;
+    clearInterval(this._iv);
+    this.setState({ running: false, interrupted: true, plugged: false, screen: 'live', tab: 'carga' });
+    this.hwSet('interrompido');
+  };
+
+  resumeSession = () => {
+    if (!this.state.sess || !this.state.interrupted) return;
+    this.setState({ running: true, interrupted: false, plugged: true });
+    clearInterval(this._iv);
+    this._iv = setInterval(this.tick, 1000);
+    this.hwSet('carregando');
   };
 
   finishSession = () => {
@@ -191,10 +1202,18 @@ class Component extends DCLogic {
     const total = s.kwh * s.tarifa;
     const pago = this.state.method === 'creditos';
     this.setState(p => ({
-      receipt: { kwh: s.kwh, tarifa: s.tarifa, total, elapsed: s.elapsed, preauth: s.preauth, metodo: p.method, spot: s.spot },
-      sess: null, running: false, screen: 'receipt',
+      receipt: { kwh: s.kwh, tarifa: s.tarifa, total, elapsed: s.elapsed, preauth: s.preauth, metodo: p.method, spot: s.spot, pagId: s.pagId, captura: 'processando' },
+      sess: null, running: false, interrupted: false, plugged: false, screen: 'receipt',
       saldo: pago ? Math.max(0, p.saldo - total) : p.saldo,
     }));
+    this.hwSet('disponivel');
+    // captura só os kWh entregues (cartão: captura parcial; Pix: estorna a sobra)
+    if (s.pagId) {
+      Pagamentos.capturar({ id: s.pagId, valor_final: total })
+        .then(r => this.setState(p => p.receipt && p.receipt.pagId === s.pagId
+          ? { receipt: { ...p.receipt, captura: 'ok', capturado: r.valor_capturado, liberado: r.liberado, split: r.split, pagStatus: r.status_detail } } : {}))
+        .catch(e => this.setState(p => p.receipt ? { receipt: { ...p.receipt, captura: 'erro', erro: e.message } } : {}));
+    }
   };
 
   chatIARef = React.createRef();
@@ -254,7 +1273,17 @@ class Component extends DCLogic {
         if (!v2 || v2.status !== 'carregando') return 'A vaga 02 está ' + (v2 && v2.status === 'falha' ? 'em falha' : 'livre') + ' agora, sem alocação. O teto para as vagas é de ' + d.teto + ' kW: ' + d.contratada + ' kW contratados menos o pico da edificação e a margem de segurança.';
         return 'Porque o medidor inteligente lê ' + d.teto + ' kW disponíveis para as vagas (' + d.contratada + ' kW contratados menos pico da edificação e margem) e o DLM divide igualmente entre as ' + d.n + ' em carga — ' + d.porVaga + ' kW cada. Os 7 kW plenos voltam quando uma vaga encerrar ou a edificação reduzir.';
       })(),
-      'Vale a pena subir a tarifa hoje?': 'Não. A ocupação prevista para hoje é 74% e o excedente solar está alto até 16h. Subir a base agora reduz sessões sem ganho líquido — o fator α já aplica +18% no horário de ponta.',
+      'Vale a pena subir a tarifa hoje?': (() => {
+        // ocupação prevista pelo modelo de ML (kWh previstos ÷ capacidade das vagas abertas)
+        const cen = this.cenarioML(), cal = MLPrev.D.calendario[0];
+        const ev = MLPrev.preverDia('ev', 0, cen).horas;
+        const cap = Math.max(1, cen.vagas) * 7;
+        const abertas = ev.filter((v, h) => h >= cal.ep_abre && h < cal.ep_fecha);
+        const ocup = Math.round(abertas.reduce((a, b) => a + b, 0) / (abertas.length * cap) * 100);
+        const cheias = ev.map((v, h) => (v >= cap * 0.85 ? h : -1)).filter(h => h >= 0);
+        if (cheias.length >= 2) return 'Só numa faixa. A ocupação prevista para hoje é ' + ocup + '%, mas das ' + cheias[0] + 'h às ' + (cheias[cheias.length - 1] + 1) + 'h a procura passa de 85% das vagas. Subir 5% a 8% ali espalha as chegadas; no resto do dia a base atual atrai mais sessões.';
+        return 'Não. A ocupação prevista para hoje é ' + ocup + '%, sem faixa acima de 85% das vagas. Subir a base agora reduz sessões sem ganho líquido — o fator α já aplica +18% no horário de ponta.';
+      })(),
       'Como fechou o mês?': (() => {
         const st = this.state;
         const dia = st.chargers.reduce((t, c) => t + (c.hoje || 0) * (c.preco || 0), 0);
@@ -273,13 +1302,26 @@ class Component extends DCLogic {
       if (/m[êe]s|fatur|receita|repasse/.test(x)) return answers['Como fechou o mês?'];
       if (/carga/.test(x)) return 'A bateria armazena o excedente solar entre 10h e 16h e devolve na faixa de ponta, das 17h às 18h. O estado de carga atual e o ciclo do dia estão no Painel, em Carregamento e descarregamento.';
       if (/falha|erro|ocpp|reset/.test(x)) return 'A Vaga 03 está sem resposta Modbus há 12 min (erro 2091). Está despublicada do mapa e fora da alocação do DLM. Você pode reiniciar remotamente em Vagas e falhas.';
+      if (/(mais|maior|pico).*(carregamento|recarga|carga|consumo|movimento)|hor[áa]rio.*(mais|pico|cheio)|teve mais/.test(x)) {
+        const hi = SnapshotIA.historico(MLPrev);
+        const ev = hi.eletroposto_horas_mais_carregamento, gl = hi.galeria_horas_mais_consumo;
+        return 'No histórico medido (' + hi.periodo + '), o eletroposto carrega mais às ' + ev.map(e => e.hora + ' (' + MLPrev.virg(e.kwh_medio) + ' kWh em média)').join(', ')
+          + '. A galeria consome mais às ' + gl.map(e => e.hora).join(', ') + '. A previsão hora a hora dos próximos dias está na tela Previsão.';
+      }
+      if (/resumo|hoje|como (est[áa]|foi) (o )?dia|status/.test(x)) {
+        const st = this.state, cs = st.chargers.filter(c => c.site === (st.siteSel || 'pn'));
+        const kwhH = cs.reduce((t, c) => t + (c.hoje || 0), 0), fat = cs.reduce((t, c) => t + (c.hoje || 0) * (c.preco || 0), 0);
+        const falha = cs.filter(c => c.status === 'falha').map(c => c.nome);
+        const b = MLPrev.balanco(0, this.cenarioML());
+        return 'Hoje até agora: ' + cs.filter(c => (c.hoje || 0) > 0).length + ' sessões, ' + MLPrev.virg(kwhH) + ' kWh entregues e ' + BRL(fat) + ' faturados. '
+          + cs.filter(c => c.status === 'carregando').length + ' vagas carregando' + (falha.length ? ' e ' + falha.join(', ') + ' em falha' : '') + '. '
+          + 'Para o dia todo o modelo prevê ' + Math.round(b.need) + ' kWh de consumo, ' + Math.round(b.solUso) + ' kWh do sol e ' + Math.round(b.rede) + ' kWh da rede.';
+      }
       if (/hor[áa]rio|abre|fecha|funcionamento/.test(x)) return 'O eletroposto opera das 10h às 21h; fora dessa janela o OCPP bloqueia novas sessões e as em andamento seguem até o fim. Ajuste em Horário de operação.';
       if (/solar|gera[çc][ãa]o|placa/.test(x)) return 'Hoje a geração soma cobertura, fachada BIPV e carport, com 80% destinada às vagas e 20% à edificação pelo rateio. Os valores hora a hora estão no Painel.';
       return 'Posso responder sobre vagas e DLM, tarifa, faturamento, bateria, compra da rede, falhas OCPP, horário de operação e geração solar. Pergunte à vontade.';
     };
-    const resp = answers[q] || livre(q);
-    this.setState(p => ({ chat: [...p.chat, { who: 'me', text: q }], perguntaSind: '' }));
-    setTimeout(() => this.setState(p => ({ chat: [...p.chat, { who: 'ai', text: resp }] })), 500);
+    this.perguntarIA('sindico', 'chat', 'perguntaSind', q, () => answers[q] || this.respostaML(q) || livre(q));
   };
 
   bump = (key, d, min, max) => this.setState(p => ({ [key]: Math.min(max, Math.max(min, p[key] + d)) }));
@@ -305,10 +1347,24 @@ class Component extends DCLogic {
     const kwp = fontes.reduce((t, f) => t + f.kwp, 0);
     const kwpEf = fontes.reduce((t, f) => t + f.kwpEf, 0);
     const pico = kwpEf * PR;
-    const maxVagas = Math.floor(pico * 0.6 / KW_VAGA);
-    const baterias = Math.floor(s.areaBateria / BAT_M2);
+    // mesmas regras do simulador do gestor: irradiação de São Paulo (média mensal da base),
+    // % do sol para o eletroposto (sugestão 80%), baterias em módulos adequados à área solar
+    // e eficiência energética reduzindo a climatização (~45% do consumo da galeria)
+    const HSP_MES = [6.78, 6.31, 5.50, 5.15, 4.28, 4.11, 4.32, 5.25, 6.11, 6.74, 6.13, 6.22];
+    const HSP_ANO = HSP_MES.reduce((a, b) => a + b, 0) / 12, mesMin = HSP_MES.indexOf(Math.min(...HSP_MES));
+    const hsp = s.viabHsp === 'min' ? HSP_MES[mesMin] : HSP_ANO;
+    const eDia = kwpEf * hsp * PR;
+    const evPct = s.viabEvPct != null ? s.viabEvPct : 80;
+    const efPct = s.viabEfPct != null ? s.viabEfPct : 0;
+    const consumoBase = s.metragem * 60 / 365;
+    const econEf = consumoBase * 0.45 * efPct / 100;
+    const solLiberado = Math.min(econEf * 0.7, eDia * (1 - evPct / 100));
+    const maxVagas = Math.floor((eDia * evPct / 100 + solLiberado) / (KW_VAGA * HSP_ANO));
+    const modRec = Math.max(0, Math.round(kwp * 0.5 / BAT_KWH));
+    const baterias = s.viabMod != null ? s.viabMod : modRec;
     const capBat = baterias * BAT_KWH;
-    const consumoGaleriaDia = s.metragem * 60 / 365;
+    const consumoGaleriaDia = consumoBase - econEf;
+    const SOMA_GER = GER_BASE.reduce((a, b) => a + b, 0);
     const vagas = Math.min(s.vagasDesejadas, 12);
     const bandas = { fora: s.tarifaBase, inter: s.tarifaBase * 1.18, ponta: s.tarifaBase * 1.76 };
 
@@ -317,7 +1373,7 @@ class Component extends DCLogic {
     let gerado = 0, evTotal = 0, galeriaTotal = 0, redeTotal = 0, custo = 0, armazenado = 0, usado = 0;
 
     for (let h = 6; h <= 22; h++) {
-      const solar = GER_BASE[h - 6] / 9.0 * kwpEf;
+      const solar = GER_BASE[h - 6] / SOMA_GER * eDia;
       const galeria = consumoGaleriaDia * (PERC[h] || 0);
       const carros = Math.round((OCUP[h] || 0) * vagas);
       const demandaEv = carros * KW_VAGA;
@@ -365,6 +1421,7 @@ class Component extends DCLogic {
       custoKwhEv, piso, receitaDia, lucroDia, lucroMes: lucroDia * 30,
       margemPct: custoKwhEv > 0 ? (s.precoVenda * 0.9 / custoKwhEv - 1) * 100 : 0,
       socFinal: carga,
+      eDia, hsp, HSP_ANO, HSP_MES, mesMin, evPct, efPct, econEf, solLiberado, modRec, consumoBase,
     };
   };
 
@@ -397,7 +1454,7 @@ class Component extends DCLogic {
       { key: 'vagas', label: 'Painel', ico: 'painel', go: 'chargers', dot: true },
       { key: 'fin', label: 'Financeiro', ico: 'financeiro', go: 'more' },
       { key: 'sindico', label: 'Síndico', ico: 'ia', go: 'sindico' },
-      { key: 'impacto', label: 'Impacto', ico: 'impacto', go: 'esg' },
+      { key: 'impacto', label: 'Impacto', ico: 'impacto', go: 'esgGal' },
     ];
     const prospect = s.role === 'host' && s.hasSolution === false;
     const prospectTabs = [
@@ -433,8 +1490,56 @@ class Component extends DCLogic {
 
     const base = (s.baseSites || {})[s.siteSel || 'pn'] ?? 2.49;
     const a = this.alfa(), vig = base * a;
-    const pico = s.kwp * 0.72;
-    const evKw = pico * (1 - s.reserva / 100);
+    // simulador de vagas: o que JÁ existe na galeria (Painel: 43,2 kWp de cobertura, 9,6 kWp de
+    // fachada BIPV, 14,4 kWp de carport, BESS de 30 kWh = 2 módulos, 4 vagas) + o que o gestor
+    // digita para ampliar. As vagas a mais saem do total menos as vagas já instaladas.
+    // Parâmetros do simulador de viabilidade: placa 450 Wp em 2,256 m², PR 0,72, fachada rende
+    // 55% e carport 90% da cobertura, módulo de bateria de 15 kWh em 1,6 m².
+    const SIM = (() => {
+      const AREA_PLACA = 2.256, WP = 450, PR = 0.72, MOD_KWH = 15, MOD_M2 = 1.6, KWH_POR_KWP = 0.5, KW_VAGA = 7;
+      const EXIST = { roof: 43.2, facade: 9.6, carport: 14.4 }, MOD_EXIST = 2, VAGAS_EXIST = 4;
+      const add = { roof: 0, facade: 0, carport: 0, ...(s.simAdd || {}) };
+      const sup = [
+        { k: 'roof', label: 'Cobertura solar', ico: '🏢', fator: 1 },
+        { k: 'facade', label: 'Fachada solar (BIPV)', ico: '🪟', fator: 0.55 },
+        { k: 'carport', label: 'Carport solar', ico: '🚗', fator: 0.9 },
+      ].map(x => {
+        const m2Exist = Math.round(EXIST[x.k] * 1000 / WP * AREA_PLACA);
+        const placasAdd = Math.floor((add[x.k] || 0) / AREA_PLACA), kwpAdd = placasAdd * WP / 1000;
+        return { ...x, m2Exist, kwpExist: EXIST[x.k], add: add[x.k] || 0, placasAdd, kwpAdd, kwpTot: EXIST[x.k] + kwpAdd, kwpEfTot: (EXIST[x.k] + kwpAdd) * x.fator, kwpEfExist: EXIST[x.k] * x.fator };
+      });
+      const kwpExist = sup.reduce((a, x) => a + x.kwpExist, 0), kwpAdd = sup.reduce((a, x) => a + x.kwpAdd, 0);
+      const picoExist = sup.reduce((a, x) => a + x.kwpEfExist, 0) * PR, pico = sup.reduce((a, x) => a + x.kwpEfTot, 0) * PR;
+      const modRecAdd = Math.max(0, Math.round((kwpExist + kwpAdd) * KWH_POR_KWP / MOD_KWH) - MOD_EXIST);
+      const modAdd = s.simModAdd != null ? s.simModAdd : modRecAdd;
+      const mod = MOD_EXIST + modAdd, batKwh = mod * MOD_KWH;
+      const evPct = s.simEvPct != null ? s.simEvPct : 80;        // regra de rateio: 80% do sol para o eletroposto
+      const fr = evPct / 100;
+      // irradiação de São Paulo (kWh/m² por dia no plano horizontal = horas de sol pleno, HSP),
+      // média de cada mês do clima da base (Av. Paulista, calibrado nas normais do INMET)
+      const HSP_MES = [6.78, 6.31, 5.50, 5.15, 4.28, 4.11, 4.32, 5.25, 6.11, 6.74, 6.13, 6.22];
+      const HSP_ANO = HSP_MES.reduce((a, b) => a + b, 0) / 12;
+      const iMin = HSP_MES.indexOf(Math.min(...HSP_MES));
+      const hsp = s.simHsp === 'min' ? HSP_MES[iMin] : HSP_ANO;
+      const kwpEfTot = sup.reduce((a, x) => a + x.kwpEfTot, 0), kwpEfExist = sup.reduce((a, x) => a + x.kwpEfExist, 0);
+      const eDia = kwpEfTot * hsp * PR, eDiaExist = kwpEfExist * hsp * PR;      // kWh gerados por dia, em média
+      // eficiência energética: materiais e envoltória melhores reduzem a climatização (HVAC) em 15% a 25%.
+      // O HVAC é ~45% do consumo do condomínio; ~70% dessa economia acontece com sol, e esse sol
+      // que a galeria deixa de usar fica livre para as vagas.
+      const galDia = (() => { const h = (typeof MLPrev !== 'undefined' ? MLPrev.D.historico.galeria : []).filter(x => x != null); return h.length ? h.reduce((a, b) => a + b, 0) / h.length * 24 : 440; })();
+      const HVAC_FR = 0.45, DIURNO = 0.7;
+      const efPct = s.simEfPct != null ? s.simEfPct : 0;
+      const econDia = galDia * HVAC_FR * efPct / 100;
+      const solLiberado = Math.min(econDia * DIURNO, eDia * (1 - fr));
+      // cada vaga de 7 kW recebe sol pelas horas de sol pleno do ano; num mês fraco, cabem menos vagas
+      const vagasTot = Math.floor((eDia * fr + solLiberado) / (KW_VAGA * HSP_ANO));
+      const vagasSemEf = Math.floor(eDia * fr / (KW_VAGA * HSP_ANO));
+      const pontaTot = Math.floor(batKwh * 0.9 / 4 / KW_VAGA), pontaExist = Math.floor(MOD_EXIST * MOD_KWH * 0.9 / 4 / KW_VAGA);
+      return { sup, kwpExist, kwpAdd, pico, picoExist, MOD_EXIST, VAGAS_EXIST, modRecAdd, modAdd, mod, batKwh, batM2Add: modAdd * MOD_M2,
+        vagasTot, vagasMais: Math.max(0, vagasTot - VAGAS_EXIST), eDia, eDiaExist, hsp, HSP_ANO, mesMin: iMin, HSP_MES, fr, galDia, efPct, econDia, solLiberado, vagasEf: vagasTot - vagasSemEf, hvacDia: galDia * HVAC_FR, pontaTot, pontaMais: Math.max(0, pontaTot - pontaExist), kwpEf: pico / PR };
+    })();
+    const pico = SIM.pico;
+    const evKw = pico * SIM.fr;
     const vagas = Math.floor(evKw / 7);
 
     const histAll = [
@@ -494,12 +1599,13 @@ class Component extends DCLogic {
       serie: 'Série ' + (c.serie || '—'),
       conector: c.conector || 'Tipo 2',
       preco: BRL(c.preco).replace('R$ ', 'R$ '),
-      led: c.status === 'carregando' ? '#149d68' : c.status === 'livre' ? '#3577f1' : c.status === 'manutencao' ? '#b97a08' : '#f5333f',
+      led: c.status === 'carregando' ? '#149d68' : c.status === 'livre' ? '#3577f1' : c.status === 'manutencao' ? '#b97a08' : c.status === 'desativada' ? '#c9cdd6' : '#f5333f',
       anim: c.status === 'carregando' ? 'cgPulse 1.2s ease-in-out infinite' : 'none',
       sub: c.status === 'carregando' ? 'Carregando · ' + String(kwDe(c)).replace('.', ',') + ' kW · faltam ' + c.min + ' min'
         : c.status === 'livre' ? 'Disponível'
+        : c.status === 'desativada' ? 'Desativada · ponto apagado e fora do mapa'
         : c.status === 'manutencao' ? 'Em manutenção · oculta no mapa' : c.erro,
-      subFg: c.status === 'falha' ? '#f5333f' : c.status === 'manutencao' ? '#7a5406' : '#7c8494',
+      subFg: c.status === 'falha' ? '#f5333f' : c.status === 'manutencao' ? '#7a5406' : c.status === 'desativada' ? '#9aa1ad' : '#7c8494',
       cardBorder: c.status === 'falha' ? '#f2c6ca' : c.status === 'manutencao' ? '#f0dcae' : '#e4e5e9',
       onOpen: () => this.setState({ screen: 'vagaDetail', tab: 'vagas', vagaSel: c.id }),
       temAlerta: c.status === 'falha',
@@ -512,6 +1618,16 @@ class Component extends DCLogic {
         this.say('Vaga 03 reiniciada via OCPP e republicada no mapa.');
       },
       onTicket: () => this.say('Chamado #4812 aberto na assistência GoodWe.'),
+      podeDesativar: c.status === 'livre',
+      desativada: c.status === 'desativada',
+      // desativar/ativar espelha no poste físico: apagado ↔ azul disponível
+      onToggleAtiva: () => {
+        const desativar = c.status === 'livre';
+        this.setState(p => ({ chargers: p.chargers.map(x => x.id === c.id ? { ...x, status: desativar ? 'desativada' : 'livre' } : x) }));
+        this.hwSet(desativar ? 'desligado' : 'disponivel');
+        this.say(desativar ? c.nome + ' desativada — o ponto foi apagado e saiu do mapa.'
+          : c.nome + ' reativada — disponível no mapa novamente.');
+      },
     }));
 
 
@@ -519,18 +1635,21 @@ class Component extends DCLogic {
     const vagaAtual = vagaBase ? { ...vagaBase, kw: kwDe(vagaBase) } : vagaBase;
     const liveBar = !dark && noTab.indexOf(s.screen) === -1 && isDriver && !!s.sess;
     const siteAtual = s.sites.find(x => x.id === (s.siteSel || 'pn')) || s.sites[0];
-    const alertasFiltrados = this.ALERTAS.filter(a => (s.alertaFiltro || 'Todos') === 'Todos'
+    const alertasTodos = this.ALERTAS.concat(s.role === 'host' ? this.alertasML() : []);
+    const alertasFiltrados = alertasTodos.filter(a => (s.alertaFiltro || 'Todos') === 'Todos'
       || ((s.alertaFiltro === 'Críticos' && a.sev === 'critico')
         || (s.alertaFiltro === 'Atenção' && a.sev === 'atencao')
         || (s.alertaFiltro === 'Informativos' && a.sev === 'info')));
 
+    const P = s.role === 'host' ? this.valsPrevisao(s, scr) : { scPrevisao: false };
     return {
+      ...P,
       mostrarFatoresIA,
       shellBg: dark ? '#0e1118' : '#efeff1',
       pageInk: dark ? '#f2f3f6' : '#131c2e',
-      statusInk: dark ? '#f2f3f6' : '#131c2e',
+      statusInk: dark || scr('login') ? '#f2f3f6' : '#131c2e',
       pageOverflow: (scr('login') || scr('registrar') || scr('role') || scr('gate')) ? 'hidden' : 'auto',
-      pagePad: scr('login') ? '62px 20px 26px' : scr('registrar') ? '54px 18px 20px'
+      pagePad: scr('login') ? '0' : scr('registrar') ? '54px 18px 20px'
         : (noTab.indexOf(s.screen) === -1 ? (liveBar ? '58px 18px 150px' : '58px 18px 92px') : '58px 18px 26px'),
       toast: s.toast,
       toastBottom: noTab.indexOf(s.screen) === -1 ? (liveBar ? '200px' : '108px') : '26px',
@@ -637,6 +1756,11 @@ class Component extends DCLogic {
 
       logged: s.logged,
       loginRole: s.pendingRole === 'host' ? 'Entrar como gestor da galeria' : s.pendingRole === 'driver' ? 'Entrar como motorista' : 'Login',
+      loginHost: s.pendingRole === 'host', loginDriver: s.pendingRole !== 'host',
+      loginPapel: s.pendingRole === 'host' ? 'Gestor' : 'Motorista',
+      loginTitulo: 'Bem-vindo de volta',
+      loginSub: s.pendingRole === 'host' ? 'Entre para acompanhar energia, vagas e faturamento da galeria.' : 'Entre para encontrar um eletroposto e recarregar com energia solar.',
+      loginEsqueci: () => this.say('Enviamos um link de redefinição para pa**********@gmail.com.'),
       lembrarMarca: s.lembrar === false ? '' : '✓',
       lembrarBorda: s.lembrar === false ? '#c9cdd6' : '#f5333f',
       lembrarFundo: s.lembrar === false ? 'transparent' : '#f5333f',
@@ -760,7 +1884,11 @@ class Component extends DCLogic {
       scInicioDriver: scr('inicioDriver'),
       entrarMotorista: () => this.setState({ role: 'driver', screen: 'monitor', tab: 'casa', monOrigem: 'gateDriver' }),
       scParceiros: scr('parceiros'),
-      goDash: () => this.setState({ screen: 'dash', tab: 'mais' }),
+      goDash: () => (this.state.screen === 'certificacao' || this.state.screen === 'parceiros') && this.state.tab === 'impacto'
+        ? this.setState({ screen: 'esgGal', tab: 'impacto' })
+        : this.state.parcVoltaViab && this.state.screen === 'parceiros'
+        ? this.setState({ screen: 'viability', parcVoltaViab: false })
+        : this.setState({ screen: 'dash', tab: 'mais', parcVoltaViab: false }),
       subTabs: [
         { label: 'Início', tela: 'dash' },
         { label: 'Gestão', tela: 'more' },
@@ -792,35 +1920,68 @@ class Component extends DCLogic {
         { label: 'EA · Energia renovável no local', sub: '67,2 kWp instalados · cobertura, fachada BIPV e carport', pts: '+3 pts', icon: '☀️', bg: '#faeed3' },
         { label: 'EA · Medição avançada de energia', sub: 'telemetria OCPP e SEMS Plus por circuito', pts: '+1 pt', icon: '📊', bg: '#dcf3ea' },
       ],
-      parcFiltros: ['Fornecedores', 'Escritórios'].map(f => ({
-        label: f,
-        bg: (s.parcFilter || 'Fornecedores') === f ? '#131c2e' : 'transparent',
-        fg: (s.parcFilter || 'Fornecedores') === f ? '#fff' : '#7c8494',
-        border: (s.parcFilter || 'Fornecedores') === f ? '#131c2e' : '#e4e5e9',
-        onPick: () => this.setState({ parcFilter: f }),
-      })),
-      parceiros: [
-        { nome: 'Terracota Materiais', grupo: 'Fornecedores', tipo: 'Fornecedor de materiais', regiao: 'São Paulo/SP', icon: '🧱', bg: '#faeed3', desc: 'Blocos e revestimentos de baixa energia incorporada, com EPD verificada. Contribui para MR · Divulgação de produtos.', selos: ['EPD verificada', 'MR · Materiais'] },
-        { nome: 'Araucária Madeira Certificada', grupo: 'Fornecedores', tipo: 'Fornecedor de materiais', regiao: 'Curitiba/PR', icon: '🌲', bg: '#dcf3ea', desc: 'Madeira de manejo com cadeia de custódia FSC para brises e mobiliário da praça central.', selos: ['FSC', 'MR · Fontes responsáveis'] },
-        { nome: 'Véu Solar Envoltórias', grupo: 'Fornecedores', tipo: 'Fachadas e vidros', regiao: 'Campinas/SP', icon: '🪟', bg: '#dee9fc', desc: 'Vidros de controle solar e fachada ventilada — reduzem a carga de HVAC e viabilizam BIPV sem aquecer a envoltória.', selos: ['EA · Eficiência', 'Conforto térmico'] },
-        { nome: 'Vértice Engenharia', grupo: 'Escritórios', tipo: 'Engenharia e comissionamento', regiao: 'São Paulo/SP', icon: '📐', bg: '#fdeaec', desc: 'Simulação energética no EnergyPlus e comissionamento fundamental exigido pelo pré-requisito de EA.', selos: ['LEED AP', 'Comissionamento'] },
-        { nome: 'Atelier Norte Arquitetura', grupo: 'Escritórios', tipo: 'Arquitetura', regiao: 'Belo Horizonte/MG', icon: '✏️', bg: '#eceef2', desc: 'Projeto integrado de retrofit com estratégias passivas, sombreamento e integração do carport fotovoltaico.', selos: ['LEED AP BD+C', 'Retrofit'] },
-      ].filter(p => p.grupo === (s.parcFilter || 'Fornecedores'))
-        .map(p => ({
-          ...p,
-          onContato: () => this.say('Pedido enviado a ' + p.nome + '. O parceiro responde em até 2 dias úteis.'),
-          onProposta: () => this.say('Briefing da galeria Pátio Norte compartilhado com ' + p.nome + '.'),
-        })),
-      parcCount: (() => {
-        const n = ['Fornecedores', 'Fornecedores', 'Fornecedores', 'Escritórios', 'Escritórios']
-          .filter(g => g === (s.parcFilter || 'Fornecedores')).length;
-        return n + (n === 1 ? ' parceiro' : ' parceiros');
+      // Parceiros GoodWe: lista escaneável (1 linha de benefício + crédito), detalhes e ações ao tocar
+      ...(() => {
+        const grupo = s.parcFilter || 'Fornecedores';
+        const CRED = {
+          MR: { sigla: 'MR', nome: 'Materiais', fg: '#7a5406', bg: '#faeed3' },
+          EA: { sigla: 'EA', nome: 'Energia', fg: '#1d4ea8', bg: '#dee9fc' },
+          IP: { sigla: 'IP', nome: 'Projeto integrado', fg: '#0f5c3f', bg: '#dcf3ea' },
+        };
+        const LISTA = [
+          { id: 'terracota', nome: 'Terracota Materiais', grupo: 'Fornecedores', tipo: 'Materiais', regiao: 'São Paulo/SP', icon: '🧱', bg: '#faeed3', cred: 'MR', resp: '2 dias',
+            curto: 'Blocos e revestimentos com EPD verificada',
+            desc: 'Blocos e revestimentos de baixa energia incorporada, com Declaração Ambiental de Produto (EPD) verificada. Soma no crédito MR · Divulgação de produtos.', selos: ['EPD verificada', 'MR · Materiais'] },
+          { id: 'araucaria', nome: 'Araucária Madeira Certificada', grupo: 'Fornecedores', tipo: 'Madeira', regiao: 'Curitiba/PR', icon: '🌲', bg: '#dcf3ea', cred: 'MR', resp: '3 dias',
+            curto: 'Madeira FSC para brises e mobiliário',
+            desc: 'Madeira de manejo com cadeia de custódia FSC para brises e mobiliário da praça central.', selos: ['FSC', 'MR · Fontes responsáveis'] },
+          { id: 'veu', nome: 'Véu Solar Envoltórias', grupo: 'Fornecedores', tipo: 'Fachadas e vidros', regiao: 'Campinas/SP', icon: '🪟', bg: '#dee9fc', cred: 'EA', resp: '2 dias',
+            curto: 'Vidros que reduzem a climatização',
+            desc: 'Vidros de controle solar e fachada ventilada: reduzem a carga da climatização e viabilizam BIPV sem aquecer a envoltória.', selos: ['EA · Eficiência', 'Conforto térmico'] },
+          { id: 'vertice', nome: 'Vértice Engenharia', grupo: 'Escritórios', tipo: 'Engenharia', regiao: 'São Paulo/SP', icon: '📐', bg: '#fdeaec', cred: 'EA', resp: '1 dia',
+            curto: 'Simulação energética e comissionamento',
+            desc: 'Simulação energética no EnergyPlus e comissionamento fundamental, exigido pelo pré-requisito de EA.', selos: ['LEED AP', 'Comissionamento'] },
+          { id: 'atelier', nome: 'Atelier Norte Arquitetura', grupo: 'Escritórios', tipo: 'Arquitetura', regiao: 'Belo Horizonte/MG', icon: '✏️', bg: '#eceef2', cred: 'IP', resp: '3 dias',
+            curto: 'Projeto de retrofit com estratégias passivas',
+            desc: 'Projeto integrado de retrofit com estratégias passivas, sombreamento e integração do carport fotovoltaico.', selos: ['LEED AP BD+C', 'Retrofit'] },
+        ];
+        const ped = s.parcPedidos || {};
+        const nG = (g) => LISTA.filter(p => p.grupo === g).length;
+        return {
+          parcFiltros: ['Fornecedores', 'Escritórios'].map(f => ({
+            label: f, n: nG(f),
+            bg: grupo === f ? '#fff' : 'transparent', fg: grupo === f ? '#131c2e' : '#7c8494',
+            sombra: grupo === f ? '0 2px 8px rgba(19,28,46,.12)' : 'none',
+            nBg: grupo === f ? '#d31e2c' : '#e4e5e9', nFg: grupo === f ? '#fff' : '#5d6572',
+            onPick: () => this.setState({ parcFilter: f, parcAberto: null }),
+          })),
+          parcIntro: grupo === 'Fornecedores'
+            ? 'Materiais que somam créditos LEED de Materiais (MR) e Energia (EA).'
+            : 'Escritórios que conduzem projeto, simulação e comissionamento.',
+          parceiros: LISTA.filter(p => p.grupo === grupo).map(p => {
+            const aberto = s.parcAberto === p.id, st = ped[p.id];
+            const c = CRED[p.cred];
+            return {
+              ...p, aberto, seta: aberto ? '⌃' : '⌄',
+              borda: aberto ? '#d31e2c' : '#e4e5e9', sombra: aberto ? '0 6px 18px rgba(19,28,46,.08)' : 'none',
+              credTxt: c.sigla + ' · ' + c.nome, credFg: c.fg, credBg: c.bg,
+              status: st === 'contato' ? '✓ Contato solicitado' : st === 'proposta' ? '✓ Proposta pedida' : '',
+              statusVis: st ? 'inline-flex' : 'none',
+              onToggle: () => this.setState(q => ({ parcAberto: q.parcAberto === p.id ? null : p.id })),
+              btnContato: st === 'contato' ? '✓ Contato solicitado' : 'Solicitar contato',
+              btnContatoBg: st === 'contato' ? '#dcf3ea' : '#d31e2c', btnContatoFg: st === 'contato' ? '#0f5c3f' : '#fff',
+              onContato: () => { this.setState(q => ({ parcPedidos: { ...(q.parcPedidos || {}), [p.id]: 'contato' } })); this.say('Pedido enviado a ' + p.nome + '. O parceiro responde em até ' + p.resp + ' úteis.'); },
+              onProposta: () => { this.setState(q => ({ parcPedidos: { ...(q.parcPedidos || {}), [p.id]: q.parcPedidos && q.parcPedidos[p.id] === 'contato' ? 'contato' : 'proposta' } })); this.say('Briefing da galeria Pátio Norte compartilhado com ' + p.nome + '.'); },
+            };
+          }),
+          parcCount: nG(grupo) + (nG(grupo) === 1 ? ' parceiro' : ' parceiros'),
+        };
       })(),
       temSolucao: s.hasSolution !== false,
       viabSub: s.hasSolution === false ? 'Antes de instalar · estimativas paramétricas' : 'Ajuste a tarifa base da galeria',
       entrarComSolucao: () => this.setState({ hasSolution: true, screen: 'dash', tab: 'mais' }),
       entrarSemSolucao: () => this.setState({ hasSolution: false, screen: 'viability', tab: 'viab', viabFromCadastro: false }),
-      resetDemo: () => { clearInterval(this._iv); this.setState({ screen: 'role', role: null, logged: false, pendingRole: null, hasSolution: null, tab: 'inicio', sess: null, running: false, receipt: null, stars: 0, spotId: 's1', mapFilter: 'Todos', histFilter: 'Tudo', goal: 80, method: 'pix', cep: '', addr: null, modelo: null }); },
+      resetDemo: () => this.hwReset(),
       logout: () => this.setState({ screen: 'role', role: null, logged: false, pendingRole: null, hasSolution: null }),
       goRole: () => this.setState({ screen: 'role', role: null }),
       goAnf: () => this.setState({ role: 'driver', screen: 'anf', tab: 'casa' }),
@@ -852,7 +2013,18 @@ class Component extends DCLogic {
         if (s.hasSolution === false) { this.setState({ screen: 'viability', viabFromCadastro: true }); return; }
         if (!paramOk) { this.say('Conclua a parametrização da tarifa base em Tarifa antes de publicar o eletroposto.'); return; }
         if (!repasseOk) { this.say('Cadastre a conta de repasse em Conta antes de receber a primeira sessão.'); return; }
-        this.setState({ screen: 'vagas', tab: 'vagas', viabFromCadastro: false });
+        // cria a vaga de fato na lista, já disponível
+        const site = s.siteSel || 'pn';
+        const n = s.chargers.filter(c => c.site === site).length + 1;
+        const num = String(n).padStart(2, '0');
+        const kwTxt = (s.modelo && s.modelo.meta ? s.modelo.meta.split(' · ')[0] : '7 kW');
+        const nova = {
+          id: 'c' + Date.now(), site, nome: 'Vaga ' + num, evse: 'PN-EVSE-' + num,
+          serie: 'GWH7-' + (2860 + n * 7) + '-BR', conector: 'Tipo 2 · ' + kwTxt,
+          status: 'livre', preco: (s.chargers.find(c => c.site === site) || {}).preco || 2.19, hoje: 0, total: 0,
+        };
+        this.setState(p => ({ chargers: [...p.chargers, nova], screen: 'vagas', tab: 'vagas', viabFromCadastro: false }));
+        this.say('Vaga ' + num + ' cadastrada e publicada no mapa.');
       },
       registerDevice: () => this.setState({ screen: 'deviceResult', modelo: MODELOS[0] }),
       openBox: () => this.setState({ screen: 'box' }),
@@ -935,7 +2107,59 @@ class Component extends DCLogic {
       vagasDesejadas: s.vagasDesejadas,
       vagasDesDec: () => this.bump('vagasDesejadas', -1, 1, 12), vagasDesInc: () => this.bump('vagasDesejadas', 1, 1, 12),
       excedeVagas: s.vagasDesejadas > V.maxVagas,
-      avisoVagas: 'Acima do suportado pela geração: ' + V.maxVagas + ' vagas com 60% do pico para EVs. A rede cobre a diferença e o custo sobe.',
+      avisoVagas: 'Acima do suportado pela geração: ' + V.maxVagas + ' vagas com ' + V.evPct + '% do sol para o eletroposto. A rede cobre a diferença e o custo sobe.',
+      // ---- simuladores do prospect no mesmo estilo do simulador do gestor
+      ...(() => {
+        const vv = (n, c = 1) => n.toFixed(c).replace('.', ',');
+        const chip = (on) => ({ bg: on ? '#dcf3ea' : '#fff3d6', fg: on ? '#0f5c3f' : '#7a5406' });
+        const meses = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+        const num = (key, min, max) => (e) => this.setState({ [key]: Math.max(min, Math.min(max, Math.round(Number(e.target.value) || 0))) });
+        return {
+          pvMetragem: s.metragem, pvMetragemOn: num('metragem', 100, 50000),
+          pvConsumo: 'Consumo estimado: ' + Math.round(V.consumoBase) + ' kWh/dia (60 kWh/m² ao ano)',
+          pvVagas: s.vagasDesejadas, pvVagasOn: num('vagasDesejadas', 1, 40),
+          pvVagasSug: 'Sugestão pela geração: ' + V.maxVagas + (V.maxVagas === 1 ? ' vaga' : ' vagas'),
+          pvSup: [['roof', 'Cobertura solar', '🏢'], ['facade', 'Fachada solar (BIPV)', '🪟'], ['carport', 'Carport solar', '🚗']].map(([k, label, ico]) => {
+            const f = V.fontes.find(x => x.k === k);
+            return {
+              k, label, ico, area: s.fontes[k].area,
+              det: f.area > 0 ? f.placas + ' placas · ' + vv(f.kwp) + ' kWp' + (k === 'facade' ? ' · rende 55% da cobertura' : k === 'carport' ? ' · rende 90% da cobertura' : '') : 'digite os m² disponíveis',
+              onChange: (e) => { const val = Math.max(0, Math.min(20000, Math.round(Number(e.target.value) || 0))); this.setState(p => ({ fontes: { ...p.fontes, [k]: { sel: val > 0, area: val } } })); },
+              obsVis: k === 'carport' ? 'block' : 'none',
+              obs: 'Carport conta como área construída não computável (cobertura de estacionamento, LPUOS — Lei 16.402/2016, art. 62) só enquanto a soma das áreas não computáveis dos incisos I a VI ficar em até 59% da área construída total; em ZEU vale ainda o limite de 1 vaga a cada 70 m² de área computável, com até 32 m² por vaga. Passou disso, pode exigir outorga onerosa. Confirmar com o arquiteto.',
+            };
+          }),
+          pvKwp: vv(V.kwp) + ' kWp', pvKwpSub: vv(V.kwpEf) + ' kWp efetivos · ' + V.placas + ' placas',
+          pvMod: V.baterias, pvModOn: (e) => this.setState({ viabMod: Math.max(0, Math.min(40, Math.round(Number(e.target.value) || 0))) }),
+          pvBatTot: V.capBat + ' kWh · ' + vv(V.baterias * 1.6) + ' m² de sala',
+          pvModRecTxt: V.baterias === V.modRec ? '✓ Adequado à área solar' : 'Adequado à área: ' + V.modRec + (V.modRec === 1 ? ' módulo' : ' módulos'),
+          pvModRecBg: chip(V.baterias === V.modRec).bg, pvModRecFg: chip(V.baterias === V.modRec).fg,
+          pvModRec: () => this.setState({ viabMod: null }),
+          pvSolarDia: Math.round(V.eDia).toLocaleString('pt-BR') + ' kWh/dia', pvSolarMes: Math.round(V.eDia * 30).toLocaleString('pt-BR') + ' kWh/mês em média',
+          pvHspTabs: [['ano', 'Média do ano', V.HSP_ANO], ['min', meses[V.mesMin] + ' (mês mais fraco)', V.HSP_MES[V.mesMin]]].map(([k, l, h]) => {
+            const on = (s.viabHsp || 'ano') === k;
+            return { label: l, sub: vv(h) + ' kWh/m²·dia', bg: on ? '#0f2a47' : '#fff', fg: on ? '#fff' : '#131c2e', sub2: on ? '#9fb6cd' : '#7c8494', borda: on ? '#0f2a47' : '#e4e5e9', onPick: () => this.setState({ viabHsp: k }) };
+          }),
+          pvEvPct: V.evPct, pvEvOn: num('viabEvPct', 0, 100), pvEvGal: 'Galeria fica com ' + (100 - V.evPct) + '% do sol',
+          pvEvSug: V.evPct === 80 ? '✓ Sugestão aplicada: 80% (regra de rateio)' : 'Usar sugestão: 80% (regra de rateio)',
+          pvEvSugBg: chip(V.evPct === 80).bg, pvEvSugFg: chip(V.evPct === 80).fg, pvEvSugPick: () => this.setState({ viabEvPct: null }),
+          pvEfPct: V.efPct, pvEfOn: num('viabEfPct', 0, 40),
+          pvEfOpcoes: [0, 15, 20, 25].map(p => ({ label: p ? p + '%' : 'sem', bg: V.efPct === p ? '#0f2a47' : '#fff', fg: V.efPct === p ? '#fff' : '#131c2e', borda: V.efPct === p ? '#0f2a47' : '#e4e5e9', onPick: () => this.setState({ viabEfPct: p }) })),
+          pvEfHvac: 'Climatização: ~' + Math.round(V.consumoBase * 0.45) + ' kWh/dia (45% do consumo da galeria) · faixa típica de 15% a 25%',
+          pvEfReal: [{ t: 'Vidro de controle solar ou película nas fachadas', p: '8%' }, { t: 'Cobertura fria e isolamento da laje', p: '5%' }, { t: 'Ajuste de setpoint e automação da climatização', p: '5%' }],
+          pvEfRealTxt: V.efPct === 18 ? '✓ Estimativa realista aplicada: 18%' : 'Aplicar estimativa realista: 18%',
+          pvEfRealBg: chip(V.efPct === 18).bg, pvEfRealFg: chip(V.efPct === 18).fg, pvEfRealPick: () => this.setState({ viabEfPct: 18 }),
+          pvEfVis: V.efPct > 0,
+          pvEfEcon: Math.round(V.econEf) + ' kWh/dia', pvEfEconMes: 'R$ ' + Math.round(V.econEf * 30).toLocaleString('pt-BR') + '/mês', pvEfSol: Math.round(V.solLiberado) + ' kWh/dia',
+          pvSugVagas: String(V.maxVagas),
+          pvSugTxt: V.maxVagas > 0 ? (V.maxVagas === 1 ? 'vaga de 7 kW' : 'vagas de 7 kW') + ' alimentadas pelo sol, com ' + V.evPct + '% para o eletroposto' : 'a geração ainda não sustenta uma vaga de 7 kW',
+          pvSugConta: '⌊(' + Math.round(V.eDia).toLocaleString('pt-BR') + ' kWh/dia × ' + V.evPct + '%' + (V.solLiberado > 0.5 ? ' + ' + Math.round(V.solLiberado) + ' kWh da eficiência' : '') + ') ÷ (7 kW × ' + V.HSP_ANO.toFixed(1).replace('.', ',') + ' h de sol pleno)⌋',
+          pvSugChip: V.vagas === V.maxVagas ? '✓ Simulação já usa as vagas sugeridas' : V.vagas > V.maxVagas ? 'Você pediu ' + V.vagas + ': ' + (V.vagas - V.maxVagas) + ' acima do sol, a rede cobre a diferença' : 'Você pediu ' + V.vagas + ': cabem mais ' + (V.maxVagas - V.vagas) + ' com o sol',
+          pvSugBtn: V.vagas !== V.maxVagas && V.maxVagas > 0,
+          pvSugUsar: () => this.setState({ vagasDesejadas: Math.max(1, Math.min(12, V.maxVagas)) }),
+          pvParceiros: () => this.setState({ screen: 'parceiros', parcFilter: 'Fornecedores', parcAberto: 'veu', parcVoltaViab: true }),
+        };
+      })(),
 
       ...(() => {
         const setArea = (k) => (e) => {
@@ -959,9 +2183,9 @@ class Component extends DCLogic {
           gerRoof: ger('roof'), gerCarport: ger('carport'), gerFacade: ger('facade'),
           resKwp: V.kwp.toFixed(1).replace('.', ','),
           resPlacas: V.placas,
-          resGeracao: V.kwp > 0 ? 'Produtividade de 4,1 kWh por kWp ao dia em São Paulo; fachada rende 55% e carport 90% da cobertura.' : 'Informe ao menos uma área para estimar a geração.',
+          resGeracao: V.kwp > 0 ? 'Geração = kWp efetivo × irradiação de São Paulo (' + V.hsp.toFixed(1).replace('.', ',') + ' kWh/m²·dia) × 0,72; fachada rende 55% e carport 90% da cobertura.' : 'Informe ao menos uma área para estimar a geração.',
           resVagas: String(V.maxVagas),
-          resVagasSub: V.maxVagas > 0 ? 'com 60% do pico solar reservado aos carros' : 'geração insuficiente para uma vaga',
+          resVagasSub: V.maxVagas > 0 ? 'com ' + V.evPct + '% do sol para o eletroposto' + (V.solLiberado > 0.5 ? ' e a eficiência energética' : '') : 'geração insuficiente para uma vaga',
           resKwhDia: fmtK(kwhDia),
           resKwhMes: fmtK(kwhMes),
           resFatMes: fmtR(fatDia * 26),
@@ -969,6 +2193,26 @@ class Component extends DCLogic {
           resFatNota: 'Com ' + V.vagas + (V.vagas === 1 ? ' vaga' : ' vagas') + ' a ' + BRL(s.precoVenda) + '/kWh e a ocupação do perfil, ' + V.evTotal.toFixed(0) + ' kWh/dia entregues em 26 dias de operação por mês. Custo da rede já descontado abaixo, no Balanço do dia.',
           usarSugestao: () => this.setState({ vagasDesejadas: Math.max(1, Math.min(12, V.maxVagas)) }),
           usarSugestaoLabel: s.vagasDesejadas === V.maxVagas ? 'Simulando com as ' + V.maxVagas + ' vagas sugeridas' : 'Simular com ' + V.maxVagas + (V.maxVagas === 1 ? ' vaga sugerida' : ' vagas sugeridas'),
+          instAberto: !!s.instAberto,
+          instToggle: () => this.setState(q => ({ instAberto: !q.instAberto })),
+          instBtnLabel: s.instAberto ? 'Fechar instaladores' : 'Instalar · contate um instalador GoodWe',
+          instBriefing: [
+            { k: 'Solar', v: V.kwp.toFixed(1).replace('.', ',') + ' kWp · ' + V.placas + ' placas' },
+            { k: 'Baterias', v: V.baterias + ' mód. · ' + V.baterias * 15 + ' kWh' },
+            { k: 'Eletroposto', v: Math.max(1, V.maxVagas) + ' vagas de 7 kW' },
+            { k: 'Inversor', v: 'híbrido GoodWe · ~' + Math.max(10, Math.ceil(V.kwp * 0.8 / 5) * 5) + ' kW' },
+          ],
+          instLista: [
+            { id: 'i1', nome: 'Sollar Prime Instalações', ini: 'SP', cor: '#0f2a47', regiao: 'São Paulo capital e ABC', espec: 'Comercial · BESS · eletropostos', visita: 'visita em até 3 dias úteis', nota: '4,9' },
+            { id: 'i2', nome: 'Ampere Engenharia Solar', ini: 'AE', cor: '#f5333f', regiao: 'Grande São Paulo', espec: 'Fachada BIPV · carport solar', visita: 'visita em até 5 dias úteis', nota: '4,8' },
+            { id: 'i3', nome: 'Raio Verde Energia', ini: 'RV', cor: '#0f8a5f', regiao: 'São Paulo e interior', espec: 'Retrofit de galerias · O&M', visita: 'visita em até 7 dias úteis', nota: '4,7' },
+          ].map(i => {
+            const ped = (s.instPedidos || {})[i.id];
+            return { ...i, pedido: !!ped, livre: !ped,
+              onPedir: () => { this.setState(q => ({ instPedidos: { ...(q.instPedidos || {}), [i.id]: true } })); this.say('Pedido de visita técnica enviado a ' + i.nome + ' com o dimensionamento da simulação.'); } };
+          }),
+          instPedidosN: Object.keys(s.instPedidos || {}).length,
+          instResumo: Object.keys(s.instPedidos || {}).length ? '✓ ' + Object.keys(s.instPedidos || {}).length + ' pedido(s) enviado(s). O instalador confirma a visita técnica e faz o projeto executivo.' : 'O dimensionamento acima vai junto no pedido; o orçamento final sai depois da visita técnica.',
           verdeItens: [
             { valor: co2Ano.toFixed(1).replace('.', ',') + ' t', label: 'CO₂ evitado por ano' },
             { valor: Math.round(co2Ano * 1000 / 22).toLocaleString('pt-BR'), label: 'árvores equivalentes' },
@@ -986,7 +2230,7 @@ class Component extends DCLogic {
         { k: 'Geração de pico (×0,72)', v: V.pico.toFixed(2).replace('.', ',') + ' kW' },
         { k: 'Máximo de vagas suportadas', v: V.maxVagas + ' vagas de 7 kW' },
         { k: 'Baterias na sala', v: V.baterias + ' módulos · ' + V.capBat + ' kWh' },
-        { k: 'Consumo médio da galeria', v: V.consumoGaleriaDia.toFixed(2).replace('.', ',') + ' kWh/dia (60 kWh/m²·ano ÷ 365)' },
+        { k: 'Consumo médio da galeria', v: V.consumoGaleriaDia.toFixed(2).replace('.', ',') + ' kWh/dia' },
         { k: 'Distribuído entre 6h e 22h', v: V.galeriaTotal.toFixed(2).replace('.', ',') + ' kWh (curva horária da galeria)' },
       ],
 
@@ -1040,7 +2284,7 @@ class Component extends DCLogic {
       boxLed: s.running ? '#149d68' : '#3577f1',
       boxAnim: s.running ? 'cgPulse 1.2s ease-in-out infinite' : 'none',
       boxStatus: s.running ? '🟢 Carregando · 6,8 kW' : '🔵 Disponível para recarga',
-      recHost: rec ? BRL(rec.total * 0.9) : '', recFee: rec ? BRL(rec.total * 0.1) : '',
+      recHost: rec ? BRL(rec.split ? rec.split.anfitriao : rec.total * 0.9) : '', recFee: rec ? BRL(rec.split ? rec.split.plataforma : rec.total * 0.1) : '',
 
       screenCaption: scr('account') ? 'Gestor · conta'
         : scr('anf') ? 'Motorista · carregador residencial'
@@ -1054,9 +2298,10 @@ class Component extends DCLogic {
         : scr('vagaDetail') ? 'Gestor · detalhe da vaga · DLM e OCPP'
         : scr('alertas') ? 'Gestor · alertas por severidade'
         : scr('certificacao') ? 'Gestor · ESG e certificação'
+        : scr('esgGal') ? 'Gestor · impacto ambiental da galeria'
         : scr('horarios') ? 'Gestor · fases operacionais e horário'
         : scr('vagas') ? 'Gestor · vagas e falhas OCPP'
-        : 'Gestor · ' + (scr('dash') ? 'início · eletroposto e serviços' : scr('chargers') ? 'painel · energia e balanço do dia' : scr('tariff') ? 'tarifa base e fator α' : scr('sindico') ? 'Síndico Virtual' : scr('sim') ? 'simulador de vagas' : scr('eletropostos') ? 'lista de eletropostos' : scr('parceiros') ? 'parceiros GoodWe e LEED' : 'financeiro · receita, economia e repasse'),
+        : 'Gestor · ' + (scr('dash') ? 'início · eletroposto e serviços' : scr('chargers') ? 'painel · energia e balanço do dia' : scr('tariff') ? 'tarifa base e fator α' : scr('sindico') ? 'Síndico Virtual' : scr('previsao') ? 'previsão de demanda · machine learning' : scr('sim') ? 'simulador de vagas' : scr('eletropostos') ? 'lista de eletropostos' : scr('parceiros') ? 'parceiros GoodWe e LEED' : 'financeiro · receita, economia e repasse'),
 
       enterDriver: () => this.setState(p => p.logged
         ? { role: 'driver', screen: 'inicioDriver', tab: 'inicio' }
@@ -1072,7 +2317,7 @@ class Component extends DCLogic {
 
       showTabs: noTab.indexOf(s.screen) === -1,
       showCtaBar: scr('confirm') || scr('pagamento'),
-      ctaLabel: scr('pagamento') ? 'Liberar carga' : 'Continuar',
+      ctaLabel: scr('pagamento') ? (s.pay && s.pay.fase === 'autorizando' ? 'Autorizando pagamento…' : s.pay && s.pay.fase === 'pix' ? 'Aguardando o Pix…' : 'Pagar e liberar carga') : 'Continuar',
       ctaAction: scr('pagamento')
         ? this.startSession
         : () => {
@@ -1152,9 +2397,33 @@ class Component extends DCLogic {
         ? { screen: 'profile', tab: 'perfil' }
         : { screen: 'account', tab: 'conta' }),
       avatarIniciais: 'PP',
-      esgBars: [['Abr', '32%'], ['Mai', '48%'], ['Jun', '41%'], ['Jul', '66%'], ['Ago', '78%'], ['Set', '94%']].map((b, i) => ({
-        d: b[0], h: b[1], color: i === 5 ? '#149d68' : '#bfe3d2',
-      })),
+      esgBars: (() => {
+        const M = [['Mar', 26], ['Abr', 24], ['Mai', 31], ['Jun', 26], ['Jul', 36], ['Ago', 33], ['Set', 38]];
+        const mx = 42;
+        return M.map((b, i) => ({ d: b[0], v: String(b[1]), h: Math.round(b[1] / mx * 100) + '%', color: i === M.length - 1 ? '#9dff33' : '#dcf8b8', fg: i === M.length - 1 ? '#3f6a0a' : '#7c8494' }));
+      })(),
+      esgMesDelta: '▲ 15% vs agosto',
+      esgEquiv: [
+        { d: 'M12 3l-5.5 7.5h11zM12 8l-6.5 8.5h13zM12 16.5V21', v: '2', l: 'árvores no mês' },
+        { d: 'M12 8a4 4 0 1 0 0 8a4 4 0 1 0 0-8M12 2.5v2.2M12 19.3v2.2M4.6 4.6l1.6 1.6M17.8 17.8l1.6 1.6M2.5 12h2.2M19.3 12h2.2M4.6 19.4l1.6-1.6M17.8 6.2l1.6-1.6', v: '150 kWh', l: 'de sol no carro' },
+        { d: 'M4.5 16h15M6.5 16v2.4M17.5 16v2.4M4.5 16v-4l1.8-4.2A2 2 0 0 1 8.1 6.5h7.8a2 2 0 0 1 1.8 1.3L19.5 12v4M4.5 12h15', v: '882 km', l: 'sem emissão' },
+      ],
+      esgAcum: [
+        { v: '214 kg', l: 'CO₂ evitado', cor: '#0f5c3f' },
+        { v: '11', l: 'árvores equivalentes', cor: '#0f5c3f' },
+        { v: '842 kWh', l: 'carregados com sol', cor: '#131c2e' },
+        { v: '4.953 km', l: 'rodados com essa energia', cor: '#131c2e' },
+      ],
+      esgSolarPct: '71%', esgSolarDash: (71 * 1.885).toFixed(1) + ' 188.5',
+      esgSolarDica: 'Dica: recarregue entre 10h e 15h, quando o sol cobre quase toda a vaga, para subir essa fatia.',
+      esgBadges: [
+        { d: 'M12 8a4 4 0 1 0 0 8a4 4 0 1 0 0-8M12 2.5v2.2M12 19.3v2.2M4.6 4.6l1.6 1.6M17.8 17.8l1.6 1.6M2.5 12h2.2M19.3 12h2.2M4.6 19.4l1.6-1.6M17.8 6.2l1.6-1.6', t: 'Primeira recarga solar', sub: 'março', ok: true, bg: '#fdeaec', op: '1', w: '100%' },
+        { d: 'M5 19c0-8 5-13 14-14c0 9-5 14-13 14M5 19l7-7', t: '100 kg evitados', sub: 'junho', ok: true, bg: '#fdeaec', op: '1', w: '100%' },
+        { d: 'M12 3l-5.5 7.5h11zM12 8l-6.5 8.5h13zM12 16.5V21', t: '250 kg evitados', sub: 'faltam 36 kg', ok: false, bg: '#eceef2', op: '.55', w: '86%' },
+      ],
+      esgCompartilhar: () => this.say('Card "Meu impacto" pronto para compartilhar: 214 kg de CO₂ evitados desde março.'),
+      esgMetodoAberto: !!s.esgMetodo, esgMetodoToggle: () => this.setState(q => ({ esgMetodo: !q.esgMetodo })),
+      esgMetodoLabel: s.esgMetodo ? 'Fechar' : 'Como calculamos',
       esgMetrics: [
         { k: 'CO₂ evitado no mês', v: '38 kg', sub: 'vs. um carro a combustão equivalente' },
         { k: 'Acumulado desde março', v: '214 kg', sub: 'equivale a 11 árvores plantadas' },
@@ -1217,6 +2486,7 @@ class Component extends DCLogic {
       goDetail: () => this.setState({ screen: 'detail', tab: 'carga' }),
       goScan: () => this.setState({ screen: 'scan', tab: 'carga' }),
       goConfirm: () => {
+        if (this.state.pay) this.cancelarPagamento();
         if (!veiculoOk) { this.say('Cadastre seu veículo elétrico em Perfil para estimarmos a recarga.'); return; }
         this.setState({ screen: 'confirm', tab: 'carga' });
       },
@@ -1272,6 +2542,14 @@ class Component extends DCLogic {
       })(),
       metaValida: this.metaKwh() > 0.05,
       liberarBg: this.metaKwh() > 0.05 ? '#f5333f' : '#e3b2b7',
+      liberarCargaBg: this.metaKwh() > 0.05 && (this.props.hardwareFisico === false || !s.hwOnline || s.plugged) ? '#f5333f' : '#e3b2b7',
+      plugStatusTxt: this.props.hardwareFisico === false || !s.hwOnline ? ''
+        : s.plugged ? '🟡 Plugue conectado ao veículo — pronto para liberar'
+        : '🔌 Conecte o cabo no carro (botão do carregador) para liberar',
+      plugStatusFg: s.plugged ? '#b97a08' : '#7c8494',
+      plugChipTxt: s.plugged ? 'plugue conectado' : 'trava ao plugar',
+      plugChipBg: s.plugged ? '#f2b01e' : '#00d1ff',
+      plugChipFg: s.plugged ? '#3d2c02' : '#06263a',
       metaUnidade: (s.modo || '') === 'km' ? 'km' : s.modo === 'kwh' ? 'kWh' : 'minutos',
       setMeta: (e) => {
         const v = Math.max(0, Number(e.target.value) || 0);
@@ -1305,27 +2583,64 @@ class Component extends DCLogic {
         onPick: () => this.setState({ method: m.key }),
       })),
       startSession: this.startSession,
+      payProvedor: (this.props.pagamentoModo === 'api' ? '' : 'Sandbox · ') + 'Mercado Pago · PCI DSS',
+      payAutorizando: !!(s.pay && s.pay.fase === 'autorizando'),
+      payAutorizandoTxt: s.pay ? (s.pay.metodo === 'pix' ? 'Gerando o QR Code Pix de ' : s.pay.metodo === 'creditos' ? 'Reservando ' : 'Pré-autorizando ') + BRL(s.pay.valor) + '…' : '',
+      payPix: !!(s.pay && s.pay.fase === 'pix'),
+      payPixValor: s.pay ? BRL(s.pay.valor) : '',
+      payPixCodigo: s.pay && s.pay.pix ? s.pay.pix.copia_e_cola : '',
+      payPixCodigoCurto: s.pay && s.pay.pix ? s.pay.pix.copia_e_cola.slice(0, 34) + '…' : '',
+      payPixExpira: s.pay && s.pay.pix ? 'expira às ' + new Date(s.pay.pix.expira_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '',
+      payPixCopiar: () => {
+        const c = s.pay && s.pay.pix ? s.pay.pix.copia_e_cola : '';
+        try { navigator.clipboard && navigator.clipboard.writeText(c); } catch (e) { /* sem área de transferência */ }
+        this.say('Código Pix copiado. Cole no app do seu banco.');
+      },
+      payCancelar: this.cancelarPagamento,
+      payAvisoA: s.method === 'pix' ? 'Você paga ' : s.method === 'creditos' ? 'Vamos reservar ' : 'Vamos pré-autorizar ',
+      payAvisoB: s.method === 'pix' ? ' por Pix agora e recebe de volta, na hora, o valor dos kWh que não usar.' : s.method === 'creditos' ? ' do seu saldo e debitar somente os kWh entregues.' : ' no cartão e capturar somente os kWh entregues ao final.',
+      payLivre: !(s.pay && (s.pay.fase === 'autorizando' || s.pay.fase === 'pix')),
+      payErro: !!(s.pay && s.pay.fase === 'erro'), payErroTxt: s.pay && s.pay.erro ? s.pay.erro : '',
+      payPixCells: (() => {
+        if (!(s.pay && s.pay.pix)) return [];
+        // QR ilustrativo determinístico a partir do payload (o QR real vem em point_of_interaction.transaction_data.qr_code_base64)
+        const txt = s.pay.pix.copia_e_cola; let h = 2166136261;
+        const out = [];
+        for (let y = 0; y < 25; y++) for (let x = 0; x < 25; x++) {
+          const fin = (x < 7 && y < 7) || (x > 17 && y < 7) || (x < 7 && y > 17);
+          if (fin) continue;
+          h ^= txt.charCodeAt((x * 25 + y) % txt.length); h = Math.imul(h, 16777619) >>> 0;
+          if (h % 100 < 46) out.push({ x: x * 10, y: y * 10 });
+        }
+        return out;
+      })(),
 
       livePct: Math.round(pctNow) + '%',
       ringPct: Math.round(pctNow) + '%',
-      ringColor: s.running ? '#9dff33' : '#149d68',
-      ringGlow: s.running ? 'rgba(157,255,51,.65)' : 'rgba(20,157,104,.4)',
-      ringGlowSoft: s.running ? 'rgba(157,255,51,.3)' : 'rgba(20,157,104,.18)',
-      ringAnim: s.running ? 'cgRingGlow 1.8s ease-in-out infinite' : 'none',
+      ringColor: s.interrupted ? '#f5333f' : s.running ? '#9dff33' : '#149d68',
+      ringGlow: s.interrupted ? 'rgba(245,51,63,.6)' : s.running ? 'rgba(157,255,51,.65)' : 'rgba(20,157,104,.4)',
+      ringGlowSoft: s.interrupted ? 'rgba(245,51,63,.25)' : s.running ? 'rgba(157,255,51,.3)' : 'rgba(20,157,104,.18)',
+      ringAnim: s.running || s.interrupted ? 'cgRingGlow 1.8s ease-in-out infinite' : 'none',
       liveKwh: sessKwh.toFixed(1).replace('.', ',') + ' kWh',
       liveValor: BRL(sessKwh * (s.sess ? s.sess.tarifa : spot.preco)),
       liveElapsed: this.fmtMin(s.sess ? s.sess.elapsed : 0),
-      liveEta: s.running ? 'faltam ' + this.fmtMin(restKwh / KW * 3600) : 'meta atingida',
-      liveKw: s.running ? '6,8 kW' : 'em espera',
+      liveEta: s.interrupted ? 'carga pausada' : s.running ? 'faltam ' + this.fmtMin(restKwh / KW * 3600) : 'meta atingida',
+      liveKw: s.interrupted ? '0 kW' : s.running ? '6,8 kW' : 'em espera',
       lockedPreco: BRL(s.sess ? s.sess.tarifa : spot.preco),
-      dlmLinha: s.running ? 'O DLM reparte ' + dlmTeto + ' kW igualmente entre as vagas em carga: ' + (emCarga[0] ? String(kwDe(emCarga[0])).replace('.', ',') : '6,8') + ' kW para você agora.' : 'Meta atingida. Encerre para liberar a vaga e emitir o recibo.',
+      scInterrupted: s.interrupted,
+      scNotInterrupted: !s.interrupted,
+      resumeSession: this.resumeSession,
+      dlmBarCor: s.interrupted ? '#f5333f' : '#9dff33',
+      dlmLinha: s.interrupted ? 'A cobrança parou junto com a carga: só os kWh já entregues contam no recibo.'
+        : s.running ? 'O DLM reparte ' + dlmTeto + ' kW igualmente entre as vagas em carga: ' + (emCarga[0] ? String(kwDe(emCarga[0])).replace('.', ',') : '6,8') + ' kW para você agora.' : 'Meta atingida. Encerre para liberar a vaga e emitir o recibo.',
       finishSession: this.finishSession,
 
       showLiveBar: liveBar,
       barBg: isDriver ? '#0e1118' : 'linear-gradient(115deg,#3a1d20,#7a2630)',
-      barLed: !isDriver ? '#f2b01e' : s.running ? '#9dff33' : '#149d68',
-      barAnim: !isDriver || s.running ? 'cgPulse 1.2s ease-in-out infinite' : 'none',
+      barLed: !isDriver ? '#f2b01e' : s.interrupted ? '#f5333f' : s.running ? '#9dff33' : '#149d68',
+      barAnim: !isDriver || s.running || s.interrupted ? 'cgPulse 1.2s ease-in-out infinite' : 'none',
       barTitle: !isDriver ? 'Controle dinâmico atuando agora'
+        : s.interrupted ? 'Recarga interrompida · plugue desconectado'
         : s.running ? 'Carregando · ' + s.pctIni + '% → ' + alvoPct + '%' : 'Meta atingida · ' + alvoPct + '%',
       barSub: !isDriver ? '2 sessões limitadas · 8,4 kW realocados para a edificação'
         : sessKwh.toFixed(1).replace('.', ',') + ' kWh · ' + BRL(sessKwh * (s.sess ? s.sess.tarifa : 0)) + ' · ' + this.fmtMin(s.sess ? s.sess.elapsed : 0),
@@ -1341,7 +2656,13 @@ class Component extends DCLogic {
         { k: 'Pré-autorizado', v: BRL(rec.preauth) },
       ] : [],
       receiptTotal: rec ? BRL(rec.total) : '',
-      captureLinha: rec ? 'Capturamos ' + BRL(rec.total) + ' dos ' + BRL(rec.preauth) + ' pré-autorizados. A diferença foi liberada no mesmo instante.' : '',
+      captureLinha: !rec ? '' : rec.captura === 'processando' ? 'Capturando o valor na API de pagamento…'
+        : rec.captura === 'erro' ? 'A captura falhou (' + rec.erro + '). Nova tentativa automática em instantes.'
+        : rec.metodo === 'pix' ? 'Pix de ' + BRL(rec.preauth) + ' pago no início; ' + BRL(rec.liberado || 0) + ' estornados para a sua conta.'
+        : rec.metodo === 'creditos' ? 'Debitamos ' + BRL(rec.total) + ' do saldo; ' + BRL(rec.liberado || 0) + ' de reserva liberados.'
+        : 'Capturamos ' + BRL(rec.capturado != null ? rec.capturado : rec.total) + ' dos ' + BRL(rec.preauth) + ' pré-autorizados; ' + BRL(rec.liberado || 0) + ' liberados no cartão.',
+      recPagId: rec && rec.pagId ? 'Transação #' + rec.pagId + ' · ' + Pagamentos.config().provedor + (Pagamentos.config().modo === 'sandbox' ? ' (sandbox)' : '') : '',
+      recPagOk: !!(rec && rec.captura === 'ok'), recPagProc: !!(rec && rec.captura === 'processando'),
       receiptEsg: rec ? (rec.kwh * 0.28).toFixed(1).replace('.', ',') + ' kg de CO₂ evitados nesta sessão' : '',
       stars: [1, 2, 3, 4, 5].map(n => ({
         color: n <= s.stars ? '#f2b01e' : '#d5d8de',
@@ -2332,7 +3653,7 @@ class Component extends DCLogic {
       scVagaDetail: scr('vagaDetail'),
       backToChargers: () => this.setState({ screen: 'vagas', tab: 'vagas' }),
       goAlertas: () => this.setState({ screen: 'alertas', tab: 'vagas' }),
-      alertaCount: String(this.ALERTAS.filter(a => a.sev !== 'info').length),
+      alertaCount: String(alertasTodos.filter(a => a.sev !== 'info').length),
       vagaNome: vagaAtual ? vagaAtual.nome : 'Vaga',
       vagaSub: siteAtual.nome + ' · OCPP 1.6',
       vagaChip: !vagaAtual ? '—' : vagaAtual.status === 'carregando' ? '● Carregando'
@@ -2413,7 +3734,7 @@ class Component extends DCLogic {
       })(),
 
       scAlertas: scr('alertas'),
-      alertaSub: this.ALERTAS.filter(a => a.sev === 'critico').length + ' críticos · ' + this.ALERTAS.filter(a => a.sev === 'atencao').length + ' em atenção',
+      alertaSub: alertasTodos.filter(a => a.sev === 'critico').length + ' críticos · ' + alertasTodos.filter(a => a.sev === 'atencao').length + ' em atenção · ' + alertasTodos.filter(a => a.ml).length + ' da previsão',
       alertaFiltros: ['Todos', 'Críticos', 'Atenção', 'Informativos'].map(f => ({
         label: f,
         border: (s.alertaFiltro || 'Todos') === f ? '#00d1ff' : '#e4e5e9',
@@ -2423,9 +3744,10 @@ class Component extends DCLogic {
         onPick: () => this.setState({ alertaFiltro: f }),
       })),
       alertaLista: alertasFiltrados.map(a => ({
-        titulo: a.titulo, quando: a.quando, local: a.local, regra: a.regra, acao: a.acao, botao: a.botao,
-        cor: this.SEV[a.sev].cor, tagBg: this.SEV[a.sev].tagBg, tagFg: this.SEV[a.sev].tagFg, sevLabel: this.SEV[a.sev].label,
+        titulo: a.titulo, quando: a.quando, local: a.local, regra: a.ml ? a.resumo + ' ' + a.regra : a.regra, acao: a.acao, botao: a.botao,
+        cor: this.SEV[a.sev].cor, tagBg: this.SEV[a.sev].tagBg, tagFg: this.SEV[a.sev].tagFg, sevLabel: this.SEV[a.sev].label + (a.ml ? ' · previsão' : ''),
         onPick: () => {
+          if (a.ml) { this.acaoAlertaML(a); return; }
           if (a.id === 'a1') {
             this.setState({ dlmReduzido: true, screen: 'vagas', tab: 'vagas' });
             this.say('Alocação das vagas em carga reduzida a 4 kW. Potência somada projetada em 8 kW, dentro do teto.');
@@ -2477,8 +3799,10 @@ class Component extends DCLogic {
       chat: [{ who: 'ai', text: 'Bom dia. Hoje até agora: ' + s.chargers.filter(c => (c.hoje || 0) > 0).length + ' sessões, '
         + s.chargers.reduce((t, c) => t + (c.hoje || 0), 0).toFixed(1).replace('.', ',') + ' kWh e '
         + BRL(s.chargers.reduce((t, c) => t + (c.hoje || 0) * (c.preco || 0), 0)) + ' faturados.'
-        + (s.chargers.some(c => c.status === 'falha') ? ' A Vaga 03 do Pátio Norte segue em falha.' : ' Nenhuma falha aberta.') }].concat(s.chat).map(c => ({
+        + (s.chargers.some(c => c.status === 'falha') ? ' A Vaga 03 do Pátio Norte segue em falha.' : ' Nenhuma falha aberta.') }]
+        .concat(P.sindicoPrevLinha ? [{ who: 'ai', text: P.sindicoPrevLinha }] : []).concat(s.chat).map(c => ({
         text: c.text,
+        meta: c.meta || '', temMeta: !!c.meta, op: c.pend ? '.5' : '1',
         align: c.who === 'me' ? 'flex-end' : 'flex-start',
         bg: c.who === 'me' ? '#131c2e' : '#fafafb',
         fg: c.who === 'me' ? '#fff' : '#131c2e',
@@ -2487,6 +3811,7 @@ class Component extends DCLogic {
       scAssistente: scr('assistente'),
       chatIA: [{ who: 'ai', text: 'Oi, Patrick. A tarifa da Pátio Norte está em ' + BRL(spot.preco) + '/kWh agora e sua bateria está em ' + s.pctIni + '%. Pergunte o que quiser.' }].concat(s.chatIA).map(c => ({
         text: c.text,
+        meta: c.meta || '', temMeta: !!c.meta, op: c.pend ? '.5' : '1',
         align: c.who === 'me' ? 'flex-end' : 'flex-start',
         bg: c.who === 'me' ? '#131c2e' : '#fafafb',
         fg: c.who === 'me' ? '#fff' : '#131c2e',
@@ -2504,7 +3829,7 @@ class Component extends DCLogic {
       promptsIA: ['Onde carrego mais barato agora?', 'Quanto custa completar a bateria?', 'Vale carregar em casa ou no eletroposto?'].map(q => ({
         label: q, onAsk: () => this.askIA(q),
       })),
-      prompts: ['Por que a vaga 02 está limitada?', 'Vale a pena subir a tarifa hoje?', 'Como fechou o mês?'].map(q => ({
+      prompts: ['Qual a previsão para a semana?', 'Algum alerta da previsão?', 'Por que a vaga 02 está limitada?', 'Vale a pena subir a tarifa hoje?', 'Como fechou o mês?'].map(q => ({
         label: q, onAsk: () => this.ask(q),
       })),
 
@@ -2518,7 +3843,7 @@ class Component extends DCLogic {
       scCertificacao: scr('certificacao'),
       ...(() => {
         const st = this.state;
-        const perE = st.esgPer || 'Dia';
+        const perE = st.esgPer || 'Mês';
         const DIAS_MES = 26;
         const multE = perE === 'Dia' ? 1 : perE === 'Mês' ? DIAS_MES : DIAS_MES * 12;
         const subE = perE === 'Dia' ? 'hoje' : perE === 'Mês' ? '26 dias de operação' : '312 dias de operação';
@@ -2554,16 +3879,114 @@ class Component extends DCLogic {
       svcSuporte: () => this.say('Assistência GoodWe · chamado #4812 em aberto.'),
 
       esgGaleria: '1,2 t', esgGaleriaArv: 'equivale a 61 árvores',
+      scEsgGal: scr('esgGal'),
+      ...(() => {
+        const st = this.state;
+        const perE = st.esgPer || 'Mês';
+        const mult = perE === 'Dia' ? 1 : perE === 'Mês' ? 26 : 312;
+        const num = (v, d) => v.toLocaleString('pt-BR', { minimumFractionDigits: d, maximumFractionDigits: d });
+        const solarKwh = 392.4 * mult, evKwh = 217 * mult;
+        const co2Sol = solarKwh * 0.0385, co2Ev = evKwh * 0.118, total = co2Sol + co2Ev;
+        const fmtKg = (v) => v >= 1000 ? num(v / 1000, 2) + ' t' : num(v, v < 100 ? 1 : 0) + ' kg';
+        const pSol = Math.round(co2Sol / total * 100);
+        const MES = [['Abr', 0.71], ['Mai', 0.78], ['Jun', 0.66], ['Jul', 0.74], ['Ago', 0.9], ['Set', 1]];
+        const base = 392.4 * 26 * 0.0385 + 217 * 26 * 0.118;
+        return {
+          egPerLabel: perE === 'Dia' ? 'hoje' : perE === 'Mês' ? 'em setembro' : 'nos últimos 12 meses',
+          egSeg: ['Dia', 'Mês', 'Ano'].map(x => ({ label: x, bg: perE === x ? '#fff' : 'transparent', fg: perE === x ? '#131c2e' : '#5d6572', sombra: perE === x ? '0 1px 4px rgba(19,28,46,.14)' : 'none', onPick: () => this.setState({ esgPer: x }) })),
+          egTotal: fmtKg(total),
+          egDelta: perE === 'Mês' ? '▲ 11% vs agosto' : perE === 'Dia' ? '▲ 4% vs média do mês' : '▲ 38% vs ano anterior',
+          // origem da energia das recargas (balanço do motor: ~62% sol direto, ~26% bateria carregada com sol, ~12% rede)
+          egOrigem: [
+            { k: 'Sol direto', p: '62%', cor: '#f5c445' },
+            { k: 'Bateria solar', p: '26%', cor: '#9dff33' },
+            { k: 'Rede', p: '12%', cor: 'rgba(255,255,255,.45)' },
+          ],
+          egOrigemTit: '88% das recargas com energia solar',
+          egEquiv: [
+            { d: 'M12 3l-5.5 7.5h11zM12 8l-6.5 8.5h13zM12 16.5V21', v: num(total / 22, 0), l: 'árvores' },
+            { d: 'M5 21V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v16M3.5 21h13M7.5 7.5h5M15 9.5h2a1.5 1.5 0 0 1 1.5 1.5v5a1.5 1.5 0 0 0 3 0V8l-3-3', v: num(evKwh * 6.2 / 12, 0) + ' L', l: 'gasolina evitada' },
+            { d: 'M4.5 16h15M6.5 16v2.4M17.5 16v2.4M4.5 16v-4l1.8-4.2A2 2 0 0 1 8.1 6.5h7.8a2 2 0 0 1 1.8 1.3L19.5 12v4M4.5 12h15', v: num(evKwh * 6.2, 0) + ' km', l: 'sem emissão' },
+          ],
+          egBars: MES.map((m, i) => ({ d: m[0], v: num(base * m[1], 0), h: Math.round(m[1] * 92) + '%', color: i === MES.length - 1 ? '#9dff33' : '#dcf8b8', fg: i === MES.length - 1 ? '#3f6a0a' : '#7c8494' })),
+          egFontes: [
+            { d: 'M12 8a4 4 0 1 0 0 8a4 4 0 1 0 0-8M12 2.5v2.2M12 19.3v2.2M4.6 4.6l1.6 1.6M17.8 17.8l1.6 1.6M2.5 12h2.2M19.3 12h2.2M4.6 19.4l1.6-1.6M17.8 6.2l1.6-1.6', t: 'Energia solar gerada', v: num(solarKwh, 0) + ' kWh', sub: 'cobertura, fachada e carport' },
+            { d: 'M13 2.8L5.6 13.4h5.6l-1 7.8 7.4-10.6h-5.6z', t: 'Recargas elétricas', v: num(evKwh, 0) + ' kWh', sub: num(evKwh / 22, 0) + ' recargas · 88% com energia solar' },
+          ],
+          egRelatorio: () => this.say('Relatório ESG de ' + (perE === 'Ano' ? '12 meses' : perE === 'Mês' ? 'setembro' : 'hoje') + ' gerado com os dados medidos pelo inversor GoodWe.'),
+          egSelo: () => this.say('Selo "Galeria movida a sol" pronto para site, redes e fachada digital.'),
+          egCert: () => this.setState({ screen: 'parceiros', tab: 'impacto', parcFilter: 'Fornecedores', parcAberto: null }),
+          egMetodoAberto: !!st.egMetodo, egMetodoToggle: () => this.setState(q => ({ egMetodo: !q.egMetodo })),
+          egMetodoLabel: st.egMetodo ? 'Fechar' : 'Como calculamos',
+        };
+      })(),
 
-      kwp: s.kwp, kwpFmt: s.kwp + ' kWp',
+      kwp: s.kwp, kwpFmt: (SIM.kwpExist + SIM.kwpAdd).toFixed(1).replace('.', ',') + ' kWp',
       setKwp: (e) => this.setState({ kwp: Number(e.target.value) }),
+      simSup: SIM.sup.map(x => ({
+        ...x,
+        exist: x.kwpExist.toFixed(1).replace('.', ',') + ' kWp · ~' + x.m2Exist + ' m²',
+        addTxt: x.add > 0 ? '+' + x.placasAdd + ' placas · +' + x.kwpAdd.toFixed(1).replace('.', ',') + ' kWp' : 'digite os m² a acrescentar',
+        obsVis: x.k === 'carport' ? 'block' : 'none',
+        obs: 'Carport conta como área construída não computável (cobertura de estacionamento, LPUOS — Lei 16.402/2016, art. 62) só enquanto a soma das áreas não computáveis dos incisos I a VI ficar em até 59% da área construída total; na Av. Paulista (ZEU) vale ainda o limite de 1 vaga a cada 70 m² de área computável, com até 32 m² por vaga. Passou disso, a área vira computável e pode exigir outorga onerosa. Confirmar com o arquiteto na versão vigente da lei.',
+        onChange: (e) => { const val = Math.max(0, Math.min(5000, Number(e.target.value) || 0)); this.setState(p => ({ simAdd: { ...(p.simAdd || {}), [x.k]: val } })); },
+      })),
+      simKwpTxt: (SIM.kwpExist + SIM.kwpAdd).toFixed(1).replace('.', ',') + ' kWp',
+      simKwpSub: SIM.kwpExist.toFixed(1).replace('.', ',') + ' kWp hoje' + (SIM.kwpAdd > 0 ? ' + ' + SIM.kwpAdd.toFixed(1).replace('.', ',') + ' kWp novos' : ''),
+      simModAdd: SIM.modAdd,
+      simModOnChange: (e) => this.setState({ simModAdd: Math.max(0, Math.min(40, Math.round(Number(e.target.value) || 0))) }),
+      simBatExist: SIM.MOD_EXIST + ' módulos · ' + SIM.MOD_EXIST * 15 + ' kWh',
+      simBatTot: 'Total: ' + SIM.mod + ' módulos · ' + SIM.batKwh + ' kWh' + (SIM.modAdd > 0 ? ' · +' + SIM.batM2Add.toFixed(1).replace('.', ',') + ' m² de sala' : ''),
+      simModRecTxt: SIM.modAdd === SIM.modRecAdd ? '✓ Adequado à área solar' : 'Adequado à área: +' + SIM.modRecAdd + (SIM.modRecAdd === 1 ? ' módulo' : ' módulos'),
+      simModRecBg: SIM.modAdd === SIM.modRecAdd ? '#dcf3ea' : '#fff3d6', simModRecFg: SIM.modAdd === SIM.modRecAdd ? '#0f5c3f' : '#7a5406',
+      simModRec: () => this.setState({ simModAdd: null }),
+      simVagasMais: '+' + SIM.vagasMais,
+      simVagasMaisTxt: SIM.vagasTot < SIM.VAGAS_EXIST ? 'o sol cobre só ' + SIM.vagasTot + ' das ' + SIM.VAGAS_EXIST + ' vagas atuais com ' + Math.round(SIM.fr * 100) + '% para o eletroposto'
+        : SIM.vagasMais === 0 ? 'Nenhuma vaga a mais com essa ampliação' : (SIM.vagasMais === 1 ? 'vaga a mais pode ser instalada' : 'vagas a mais podem ser instaladas'),
+      simVagasConta: 'Hoje ' + SIM.VAGAS_EXIST + ' vagas → até ' + SIM.vagasTot + ' vagas com a ampliação' + (SIM.vagasEf > 0 ? ' (' + SIM.vagasEf + ' pela eficiência)' : ''),
+      simVagasPonta: SIM.pontaTot > 0 ? '🔋 a bateria sustenta ' + SIM.pontaTot + (SIM.pontaTot > 1 ? ' vagas' : ' vaga') + ' na ponta (17h–21h)' + (SIM.pontaMais > 0 ? ', +' + SIM.pontaMais + ' com os novos módulos' : '') : '🔋 bateria pequena para sustentar uma vaga na ponta',
+      simLimpar: () => this.setState({ simAdd: {}, simModAdd: null }),
       reserva: s.reserva, reservaFmt: s.reserva + '%',
       setReserva: (e) => this.setState({ reserva: Number(e.target.value) }),
+      simEvPct: Math.round(SIM.fr * 100),
+      simEfPct: SIM.efPct,
+      simEfOnChange: (e) => this.setState({ simEfPct: Math.max(0, Math.min(40, Math.round(Number(e.target.value) || 0))) }),
+      simEfOpcoes: [0, 15, 20, 25].map(p => ({ label: p ? p + '%' : 'sem', on: SIM.efPct === p, bg: SIM.efPct === p ? '#0f2a47' : '#fff', fg: SIM.efPct === p ? '#fff' : '#131c2e', borda: SIM.efPct === p ? '#0f2a47' : '#e4e5e9', onPick: () => this.setState({ simEfPct: p }) })),
+      simEfHvac: 'Climatização hoje: ~' + Math.round(SIM.hvacDia) + ' kWh/dia (45% dos ' + Math.round(SIM.galDia) + ' kWh do condomínio)',
+      simEfVis: SIM.efPct > 0,
+      simEfEcon: Math.round(SIM.econDia) + ' kWh/dia',
+      simEfEconMes: 'R$ ' + Math.round(SIM.econDia * 30 * 1.0).toLocaleString('pt-BR') + '/mês',
+      simEfSol: Math.round(SIM.solLiberado) + ' kWh/dia',
+      simEfVagas: SIM.vagasEf > 0 ? '+' + SIM.vagasEf + (SIM.vagasEf > 1 ? ' vagas' : ' vaga') + ' pela eficiência' : 'não muda o número de vagas',
+      // estimativa realista para uma galeria comercial em São Paulo (retrofit sem trocar o sistema central)
+      simEfReal: [
+        { t: 'Vidro de controle solar ou película nas fachadas', p: '8%' },
+        { t: 'Cobertura fria e isolamento da laje', p: '5%' },
+        { t: 'Ajuste de setpoint e automação da climatização', p: '5%' },
+      ],
+      simEfRealTxt: SIM.efPct === 18 ? '✓ Estimativa realista aplicada: 18%' : 'Aplicar estimativa realista: 18%',
+      simEfRealBg: SIM.efPct === 18 ? '#dcf3ea' : '#fff3d6', simEfRealFg: SIM.efPct === 18 ? '#0f5c3f' : '#7a5406',
+      simEfRealPick: () => this.setState({ simEfPct: 18 }),
+      simEfAviso: SIM.efPct > 0 && (SIM.efPct < 15 || SIM.efPct > 25) ? 'Fora da faixa típica de 15% a 25% para retrofit de envoltória e materiais.' : '',
+      simEfParceiros: () => this.setState({ screen: 'parceiros', tab: 'mais', parcFilter: 'Fornecedores', parcAberto: 'veu' }),
+      simEvOnChange: (e) => this.setState({ simEvPct: Math.max(0, Math.min(100, Math.round(Number(e.target.value) || 0))) }),
+      simEvGal: 'Galeria fica com ' + (100 - Math.round(SIM.fr * 100)) + '% do sol',
+      simEvSug: Math.round(SIM.fr * 100) === 80 ? '✓ Sugestão aplicada: 80% (regra de rateio)' : 'Usar sugestão: 80% (regra de rateio)',
+      simEvSugBg: Math.round(SIM.fr * 100) === 80 ? '#dcf3ea' : '#fff3d6', simEvSugFg: Math.round(SIM.fr * 100) === 80 ? '#0f5c3f' : '#7a5406',
+      simEvSugPick: () => this.setState({ simEvPct: null }),
       vagas: vagas,
-      formulaLinha: '⌊(' + pico.toFixed(1).replace('.', ',') + ' kW × ' + (100 - s.reserva) + '%) ÷ 7 kW⌋',
+      formulaLinha: '⌊(' + Math.round(SIM.eDia).toLocaleString('pt-BR') + ' kWh/dia × ' + Math.round(SIM.fr * 100) + '%' + (SIM.solLiberado > 0.5 ? ' + ' + Math.round(SIM.solLiberado) + ' kWh da eficiência' : '') + ') ÷ (7 kW × ' + SIM.HSP_ANO.toFixed(1).replace('.', ',') + ' h de sol pleno)⌋',
       picoFmt: pico.toFixed(1).replace('.', ',') + ' kW',
       evKwFmt: evKw.toFixed(1).replace('.', ',') + ' kW',
       receitaPot: BRL(vagas * 7 * 4 * 26 * 0.35),
+      simSolarDia: Math.round(SIM.eDiaExist).toLocaleString('pt-BR') + ' → ' + Math.round(SIM.eDia).toLocaleString('pt-BR') + ' kWh/dia',
+      simSolarMes: Math.round(SIM.eDia * 30).toLocaleString('pt-BR') + ' kWh/mês',
+      simHspTabs: [['ano', 'Média do ano', SIM.HSP_ANO], ['min', ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'][SIM.mesMin] + ' (mês mais fraco)', SIM.HSP_MES[SIM.mesMin]]].map(([k, l, h]) => {
+        const on = (s.simHsp || 'ano') === k;
+        return { label: l, sub: h.toFixed(1).replace('.', ',') + ' kWh/m²·dia', bg: on ? '#0f2a47' : '#fff', fg: on ? '#fff' : '#131c2e', sub2: on ? '#9fb6cd' : '#7c8494', borda: on ? '#0f2a47' : '#e4e5e9', onPick: () => this.setState({ simHsp: k }) };
+      }),
+      simIrrNota: 'Geração média = kWp efetivo × irradiação de São Paulo × 0,72 (perdas). Irradiação: média de cada mês do clima da base (Av. Paulista).',
+      simPicoTxt: SIM.picoExist.toFixed(1).replace('.', ',') + ' → ' + SIM.pico.toFixed(1).replace('.', ',') + ' kW',
     };
   }
 }

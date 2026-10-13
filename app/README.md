@@ -27,6 +27,9 @@ app/
 ├── src/                      ← os fontes: é só aqui que se edita
 │   ├── template.html            marcação das telas (sintaxe do runtime: {{ }}, <sc-if>, <sc-for>)
 │   ├── app.js                   toda a lógica — class Component extends DCLogic
+│   ├── ml/
+│   │   ├── previsao-dados.js    GERADO pelo notebook ../inteligencia/ChargeGrid_ML.ipynb (árvores + insumos)
+│   │   └── previsao-motor.js    inferência do modelo, explicações e alertas do Síndico
 │   ├── props.json               parâmetros ajustáveis do protótipo
 │   └── styles/
 │       ├── fonts.css            @font-face da Nunito (5 subconjuntos)
@@ -81,11 +84,39 @@ Os avisos `Expected length, "{{ c.x }}"` que aparecem no console vêm do navegad
 tentando interpretar os placeholders do template antes de o runtime compilá-lo. São
 esperados e ocorrem igualmente no arquivo original.
 
+## Previsão de demanda (machine learning)
+
+A tela **Previsão** do gestor (card "Previsão · IA" no Início, botão no Síndico
+e alertas com o selo "previsão") mostra, para o dia e para a semana, a energia
+necessária (galeria + eletroposto, na mesma tela), de onde ela vem (solar,
+bateria, rede), a recomendação de load-shifting quando compensa, o efeito de
+cada fator (temperatura, sol, chuva, feriado, dia da semana, vaga em falha), o
+pico previsto na rede contra o teto do DLM e os alertas do Síndico Virtual. O
+modelo roda no próprio app. Treino, base simulada e métricas estão em
+[`../inteligencia/`](../inteligencia/). Para atualizar o modelo:
+
+```bash
+cd ../inteligencia && python3 preparar_dataset.py && python3 executar_notebook.py ChargeGrid_ML.ipynb && python3 testar_paridade_js.py
+cd ../app && python3 build.py
+```
+
+A integração com o ESP32 não foi alterada.
+
 ## Limitações
 
 - Nenhuma chamada de rede além dos 4 `<iframe>` de mapa do Google. Não há Supabase,
   não há API, não há persistência: recarregar a página zera o estado.
+- **Pagamento** passa por `src/pagamento/gateway.js`. Com a prop `pagamentoModo = sandbox`
+  (padrão) as respostas da API do Mercado Pago são simuladas no navegador: Pix com QR Code e
+  confirmação em ~4 s, cartão com pré-autorização e captura parcial, créditos com reserva.
+  Com `api`, o mesmo cliente chama a Edge Function `../supabase/functions/pagamentos`.
+- **Assistente IA e Síndico Virtual** passam por `src/ia/assistente.js`. Com a prop `iaModo = sandbox`
+  (padrão) respondem com as regras locais; com `api`, chamam a Edge Function
+  `../supabase/functions/assistente` (LangGraph + OpenAI + RAG no pgvector), mandando junto o
+  snapshot de `src/ia/snapshot.js` com os números do modelo de ML. Se a API falhar, voltam às regras locais.
 - **Não conversa com o ESP32.** Religar ao hardware passa pelo Supabase, conforme a
   arquitetura alvo. Hoje quem fala com o equipamento é `../demo-fisica/app-v1/`.
 - Tarifação dinâmica, DLM e load shifting rodam no cliente com dados sintéticos.
+- A previsão usa a base simulada de `../inteligencia/` e a previsão do tempo
+  emitida em 11/10/2026: os dias previstos são 12 a 18/10/2026.
 - A tela de login é navegação, não autenticação.

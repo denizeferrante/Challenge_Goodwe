@@ -1,0 +1,901 @@
+id,motorista_id,marca,modelo,apelido,capacidade_bateria_kwh
+1,2,BYD,Dolphin Mini,,38.0
+2,3,GWM,Ora 03,,48.0
+3,4,GWM,Ora 03,,48.0
+4,5,BYD,Dolphin Mini,,38.0
+5,6,Chevrolet,Bolt EUV,,65.0
+6,7,BYD,Dolphin,,44.9
+7,8,Renault,Kwid E-Tech,,26.8
+8,9,BYD,Dolphin,,44.9
+9,10,GWM,Ora 03,,48.0
+10,11,BYD,Dolphin Mini,,38.0
+11,12,BYD,Dolphin Mini,,38.0
+12,13,BYD,Seal,,82.5
+13,14,BYD,Dolphin Mini,,38.0
+14,15,BYD,Seal,,82.5
+15,16,Volvo,EX30,,51.0
+16,17,BMW,iX1,,64.7
+17,18,BYD,Dolphin Mini,,38.0
+18,19,Volvo,EX30,,51.0
+19,20,BYD,Dolphin Mini,,38.0
+20,21,BYD,Song Plus DM-i (PHEV),,18.3
+21,22,BYD,Dolphin,,44.9
+22,23,BYD,Dolphin Mini,,38.0
+23,24,GWM,Ora 03,,48.0
+24,25,BYD,Song Plus DM-i (PHEV),,18.3
+25,26,BYD,Dolphin Mini,,38.0
+26,27,BYD,Song Plus DM-i (PHEV),,18.3
+27,28,BYD,Dolphin,,44.9
+28,29,Peugeot,e-2008,,50.0
+29,30,BYD,Dolphin Mini,,38.0
+30,31,BYD,Song Plus DM-i (PHEV),,18.3
+31,32,BYD,Song Plus DM-i (PHEV),,18.3
+32,33,BYD,Yuan Pro,,45.1
+33,34,BYD,Dolphin Mini,,38.0
+34,35,BYD,Dolphin Mini,,38.0
+35,36,BYD,Dolphin,,44.9
+36,37,BYD,Dolphin,,44.9
+37,38,BYD,Dolphin Mini,,38.0
+38,39,BYD,Yuan Pro,,45.1
+39,40,Renault,Kwid E-Tech,,26.8
+40,41,BYD,Dolphin Mini,,38.0
+41,42,BYD,Dolphin Mini,,38.0
+42,43,BYD,Song Plus DM-i (PHEV),,18.3
+43,44,BYD,Yuan Pro,,45.1
+44,45,BYD,Seal,,82.5
+45,46,BYD,Yuan Pro,,45.1
+46,47,BYD,Dolphin,,44.9
+47,48,BYD,Dolphin,,44.9
+48,49,BYD,Dolphin Mini,,38.0
+49,50,BYD,Song Plus DM-i (PHEV),,18.3
+50,51,BYD,Dolphin Mini,,38.0
+51,52,BYD,Seal,,82.5
+52,53,BYD,Dolphin,,44.9
+53,54,BYD,Dolphin Mini,,38.0
+54,55,BYD,Dolphin Mini,,38.0
+55,56,BYD,Dolphin,,44.9
+56,57,BYD,Dolphin Mini,,38.0
+57,58,BYD,Dolphin Mini,,38.0
+58,59,BYD,Yuan Pro,,45.1
+59,60,BYD,Dolphin Mini,,38.0
+60,61,BYD,Seal,,82.5
+61,62,Renault,Kwid E-Tech,,26.8
+62,63,Volvo,EX30,,51.0
+63,64,BYD,Seal,,82.5
+64,65,BYD,Dolphin Mini,,38.0
+65,66,BYD,Dolphin Mini,,38.0
+66,67,GWM,Ora 03,,48.0
+67,68,BYD,Dolphin Mini,,38.0
+68,69,BYD,Dolphin Mini,,38.0
+69,70,BYD,Dolphin Mini,,38.0
+70,71,BYD,Dolphin Mini,,38.0
+71,72,BYD,Dolphin Mini,,38.0
+72,73,BYD,Dolphin,,44.9
+73,74,BYD,Dolphin,,44.9
+74,75,BYD,Dolphin,,44.9
+75,76,BYD,Yuan Pro,,45.1
+76,77,BYD,Yuan Pro,,45.1
+77,78,BYD,Seal,,82.5
+78,79,Volvo,EX30,,51.0
+79,80,BYD,Dolphin,,44.9
+80,81,BYD,Dolphin Mini,,38.0
+81,82,BYD,Seal,,82.5
+82,83,BYD,Dolphin,,44.9
+83,84,BYD,Dolphin,,44.9
+84,85,Chevrolet,Bolt EUV,,65.0
+85,86,BYD,Dolphin Mini,,38.0
+86,87,BMW,iX1,,64.7
+87,88,GWM,Haval H6 PHEV,,34.0
+88,89,BYD,Dolphin Mini,,38.0
+89,90,BYD,Dolphin Mini,,38.0
+90,91,BYD,Dolphin,,44.9
+91,92,BYD,Dolphin Mini,,38.0
+92,93,Renault,Kwid E-Tech,,26.8
+93,94,BYD,Dolphin,,44.9
+94,95,BYD,Yuan Pro,,45.1
+95,96,GWM,Ora 03,,48.0
+96,97,BYD,Yuan Pro,,45.1
+97,98,BYD,Dolphin Mini,,38.0
+98,99,BMW,iX1,,64.7
+99,100,Volvo,EX30,,51.0
+100,101,BMW,iX1,,64.7
+101,102,BYD,Dolphin,,44.9
+102,103,Chevrolet,Bolt EUV,,65.0
+103,104,BYD,Dolphin Mini,,38.0
+104,105,BYD,Yuan Pro,,45.1
+105,106,Chevrolet,Bolt EUV,,65.0
+106,107,Volvo,EX30,,51.0
+107,108,BYD,Song Plus DM-i (PHEV),,18.3
+108,109,BYD,Dolphin,,44.9
+109,110,GWM,Ora 03,,48.0
+110,111,BYD,Song Plus DM-i (PHEV),,18.3
+111,112,BYD,Song Plus DM-i (PHEV),,18.3
+112,113,GWM,Ora 03,,48.0
+113,114,BYD,Dolphin Mini,,38.0
+114,115,BYD,Dolphin,,44.9
+115,116,BYD,Dolphin Mini,,38.0
+116,117,BYD,Dolphin Mini,,38.0
+117,118,BYD,Dolphin Mini,,38.0
+118,119,BYD,Dolphin,,44.9
+119,120,BYD,Dolphin Mini,,38.0
+120,121,GWM,Ora 03,,48.0
+121,122,BYD,Song Plus DM-i (PHEV),,18.3
+122,123,BYD,Dolphin,,44.9
+123,124,BYD,Dolphin,,44.9
+124,125,BYD,Dolphin Mini,,38.0
+125,126,BMW,iX1,,64.7
+126,127,BYD,Dolphin Mini,,38.0
+127,128,BYD,Dolphin,,44.9
+128,129,BYD,Dolphin Mini,,38.0
+129,130,BYD,Dolphin Mini,,38.0
+130,131,BYD,Dolphin Mini,,38.0
+131,132,BYD,Dolphin Mini,,38.0
+132,133,BYD,Seal,,82.5
+133,134,BYD,Seal,,82.5
+134,135,BYD,Dolphin Mini,,38.0
+135,136,Renault,Kwid E-Tech,,26.8
+136,137,BYD,Dolphin,,44.9
+137,138,BYD,Dolphin,,44.9
+138,139,Renault,Kwid E-Tech,,26.8
+139,140,BYD,Song Plus DM-i (PHEV),,18.3
+140,141,Chevrolet,Bolt EUV,,65.0
+141,142,BYD,Dolphin Mini,,38.0
+142,143,BYD,Dolphin Mini,,38.0
+143,144,BYD,Song Plus DM-i (PHEV),,18.3
+144,145,BYD,Yuan Pro,,45.1
+145,146,BYD,Dolphin,,44.9
+146,147,BYD,Dolphin Mini,,38.0
+147,148,BYD,Song Plus DM-i (PHEV),,18.3
+148,149,BYD,Dolphin Mini,,38.0
+149,150,BYD,Dolphin Mini,,38.0
+150,151,BYD,Dolphin,,44.9
+151,152,BYD,Dolphin Mini,,38.0
+152,153,Renault,Kwid E-Tech,,26.8
+153,154,Renault,Kwid E-Tech,,26.8
+154,155,Volvo,EX30,,51.0
+155,156,BYD,Dolphin Mini,,38.0
+156,157,BYD,Seal,,82.5
+157,158,BYD,Dolphin Mini,,38.0
+158,159,BYD,Yuan Pro,,45.1
+159,160,BYD,Dolphin Mini,,38.0
+160,161,Renault,Kwid E-Tech,,26.8
+161,162,GWM,Ora 03,,48.0
+162,163,BYD,Dolphin,,44.9
+163,164,BYD,Dolphin Mini,,38.0
+164,165,GWM,Ora 03,,48.0
+165,166,Renault,Kwid E-Tech,,26.8
+166,167,GWM,Haval H6 PHEV,,34.0
+167,168,BYD,Dolphin Mini,,38.0
+168,169,BYD,Dolphin Mini,,38.0
+169,170,BYD,Dolphin,,44.9
+170,171,BYD,Song Plus DM-i (PHEV),,18.3
+171,172,GWM,Ora 03,,48.0
+172,173,GWM,Ora 03,,48.0
+173,174,BYD,Dolphin Mini,,38.0
+174,175,BYD,Dolphin Mini,,38.0
+175,176,Volvo,EX30,,51.0
+176,177,BYD,Seal,,82.5
+177,178,Renault,Kwid E-Tech,,26.8
+178,179,GWM,Ora 03,,48.0
+179,180,BYD,Dolphin Mini,,38.0
+180,181,BYD,Dolphin,,44.9
+181,182,BYD,Dolphin Mini,,38.0
+182,183,Renault,Kwid E-Tech,,26.8
+183,184,BYD,Dolphin Mini,,38.0
+184,185,Chevrolet,Bolt EUV,,65.0
+185,186,Volvo,EX30,,51.0
+186,187,BYD,Song Plus DM-i (PHEV),,18.3
+187,188,GWM,Ora 03,,48.0
+188,189,Renault,Kwid E-Tech,,26.8
+189,190,BYD,Dolphin Mini,,38.0
+190,191,BYD,Song Plus DM-i (PHEV),,18.3
+191,192,Renault,Kwid E-Tech,,26.8
+192,193,BYD,Dolphin,,44.9
+193,194,Peugeot,e-2008,,50.0
+194,195,BYD,Dolphin Mini,,38.0
+195,196,BYD,Dolphin Mini,,38.0
+196,197,BMW,iX1,,64.7
+197,198,BMW,iX1,,64.7
+198,199,BYD,Song Plus DM-i (PHEV),,18.3
+199,200,BYD,Dolphin,,44.9
+200,201,Peugeot,e-2008,,50.0
+201,202,BMW,iX1,,64.7
+202,203,BYD,Song Plus DM-i (PHEV),,18.3
+203,204,Chevrolet,Bolt EUV,,65.0
+204,205,GWM,Haval H6 PHEV,,34.0
+205,206,BYD,Seal,,82.5
+206,207,BYD,Song Plus DM-i (PHEV),,18.3
+207,208,BYD,Dolphin,,44.9
+208,209,BYD,Song Plus DM-i (PHEV),,18.3
+209,210,Renault,Kwid E-Tech,,26.8
+210,211,BYD,Dolphin,,44.9
+211,212,Peugeot,e-2008,,50.0
+212,213,Renault,Kwid E-Tech,,26.8
+213,214,GWM,Ora 03,,48.0
+214,215,BYD,Dolphin,,44.9
+215,216,Volvo,EX30,,51.0
+216,217,BYD,Dolphin Mini,,38.0
+217,218,BYD,Song Plus DM-i (PHEV),,18.3
+218,219,BMW,iX1,,64.7
+219,220,GWM,Ora 03,,48.0
+220,221,BYD,Dolphin Mini,,38.0
+221,222,BYD,Dolphin,,44.9
+222,223,BYD,Yuan Pro,,45.1
+223,224,BYD,Song Plus DM-i (PHEV),,18.3
+224,225,Peugeot,e-2008,,50.0
+225,226,GWM,Haval H6 PHEV,,34.0
+226,227,BYD,Seal,,82.5
+227,228,BYD,Dolphin Mini,,38.0
+228,229,BMW,iX1,,64.7
+229,230,BYD,Dolphin Mini,,38.0
+230,231,BYD,Dolphin Mini,,38.0
+231,232,Volvo,EX30,,51.0
+232,233,GWM,Ora 03,,48.0
+233,234,Peugeot,e-2008,,50.0
+234,235,Volvo,EX30,,51.0
+235,236,BYD,Song Plus DM-i (PHEV),,18.3
+236,237,GWM,Ora 03,,48.0
+237,238,BYD,Song Plus DM-i (PHEV),,18.3
+238,239,Chevrolet,Bolt EUV,,65.0
+239,240,BYD,Dolphin Mini,,38.0
+240,241,BYD,Dolphin Mini,,38.0
+241,242,BYD,Dolphin Mini,,38.0
+242,243,BYD,Dolphin Mini,,38.0
+243,244,Renault,Kwid E-Tech,,26.8
+244,245,BYD,Dolphin Mini,,38.0
+245,246,GWM,Haval H6 PHEV,,34.0
+246,247,BYD,Dolphin,,44.9
+247,248,GWM,Haval H6 PHEV,,34.0
+248,249,BYD,Dolphin Mini,,38.0
+249,250,BYD,Dolphin Mini,,38.0
+250,251,BYD,Seal,,82.5
+251,252,GWM,Haval H6 PHEV,,34.0
+252,253,Chevrolet,Bolt EUV,,65.0
+253,254,BYD,Song Plus DM-i (PHEV),,18.3
+254,255,BYD,Dolphin Mini,,38.0
+255,256,BYD,Dolphin,,44.9
+256,257,Chevrolet,Bolt EUV,,65.0
+257,258,BYD,Dolphin Mini,,38.0
+258,259,BYD,Song Plus DM-i (PHEV),,18.3
+259,260,GWM,Haval H6 PHEV,,34.0
+260,261,BYD,Dolphin Mini,,38.0
+261,262,BMW,iX1,,64.7
+262,263,GWM,Ora 03,,48.0
+263,264,BYD,Dolphin Mini,,38.0
+264,265,BYD,Song Plus DM-i (PHEV),,18.3
+265,266,BYD,Song Plus DM-i (PHEV),,18.3
+266,267,Volvo,EX30,,51.0
+267,268,BMW,iX1,,64.7
+268,269,BYD,Song Plus DM-i (PHEV),,18.3
+269,270,BYD,Dolphin,,44.9
+270,271,Chevrolet,Bolt EUV,,65.0
+271,272,BYD,Dolphin,,44.9
+272,273,BYD,Dolphin Mini,,38.0
+273,274,BYD,Dolphin,,44.9
+274,275,Renault,Kwid E-Tech,,26.8
+275,276,GWM,Ora 03,,48.0
+276,277,Chevrolet,Bolt EUV,,65.0
+277,278,BMW,iX1,,64.7
+278,279,BYD,Dolphin Mini,,38.0
+279,280,BYD,Dolphin Mini,,38.0
+280,281,GWM,Haval H6 PHEV,,34.0
+281,282,Volvo,EX30,,51.0
+282,283,BYD,Dolphin,,44.9
+283,284,Renault,Kwid E-Tech,,26.8
+284,285,Renault,Kwid E-Tech,,26.8
+285,286,GWM,Ora 03,,48.0
+286,287,Chevrolet,Bolt EUV,,65.0
+287,288,BYD,Dolphin Mini,,38.0
+288,289,BYD,Yuan Pro,,45.1
+289,290,GWM,Ora 03,,48.0
+290,291,Renault,Kwid E-Tech,,26.8
+291,292,BYD,Dolphin Mini,,38.0
+292,293,BYD,Seal,,82.5
+293,294,Renault,Kwid E-Tech,,26.8
+294,295,BYD,Dolphin Mini,,38.0
+295,296,BYD,Dolphin,,44.9
+296,297,Volvo,EX30,,51.0
+297,298,BYD,Dolphin Mini,,38.0
+298,299,BYD,Yuan Pro,,45.1
+299,300,BYD,Dolphin,,44.9
+300,301,BYD,Dolphin,,44.9
+301,302,BYD,Dolphin,,44.9
+302,303,GWM,Haval H6 PHEV,,34.0
+303,304,BYD,Dolphin,,44.9
+304,305,BYD,Song Plus DM-i (PHEV),,18.3
+305,306,BYD,Yuan Pro,,45.1
+306,307,BYD,Dolphin Mini,,38.0
+307,308,GWM,Ora 03,,48.0
+308,309,GWM,Ora 03,,48.0
+309,310,BYD,Dolphin,,44.9
+310,311,BYD,Song Plus DM-i (PHEV),,18.3
+311,312,BYD,Song Plus DM-i (PHEV),,18.3
+312,313,GWM,Ora 03,,48.0
+313,314,BYD,Yuan Pro,,45.1
+314,315,BYD,Dolphin Mini,,38.0
+315,316,BYD,Dolphin Mini,,38.0
+316,317,BYD,Dolphin Mini,,38.0
+317,318,BYD,Song Plus DM-i (PHEV),,18.3
+318,319,BYD,Dolphin Mini,,38.0
+319,320,Renault,Kwid E-Tech,,26.8
+320,321,BYD,Seal,,82.5
+321,322,Peugeot,e-2008,,50.0
+322,323,GWM,Ora 03,,48.0
+323,324,BYD,Dolphin Mini,,38.0
+324,325,BYD,Dolphin Mini,,38.0
+325,326,GWM,Haval H6 PHEV,,34.0
+326,327,BYD,Dolphin,,44.9
+327,328,BYD,Song Plus DM-i (PHEV),,18.3
+328,329,BYD,Dolphin Mini,,38.0
+329,330,BYD,Dolphin Mini,,38.0
+330,331,Chevrolet,Bolt EUV,,65.0
+331,332,Volvo,EX30,,51.0
+332,333,BYD,Yuan Pro,,45.1
+333,334,BMW,iX1,,64.7
+334,335,Volvo,EX30,,51.0
+335,336,BYD,Song Plus DM-i (PHEV),,18.3
+336,337,GWM,Haval H6 PHEV,,34.0
+337,338,BYD,Dolphin Mini,,38.0
+338,339,BYD,Dolphin,,44.9
+339,340,Chevrolet,Bolt EUV,,65.0
+340,341,BYD,Song Plus DM-i (PHEV),,18.3
+341,342,Renault,Kwid E-Tech,,26.8
+342,343,BYD,Dolphin Mini,,38.0
+343,344,BYD,Song Plus DM-i (PHEV),,18.3
+344,345,BYD,Yuan Pro,,45.1
+345,346,Volvo,EX30,,51.0
+346,347,BYD,Dolphin Mini,,38.0
+347,348,BYD,Song Plus DM-i (PHEV),,18.3
+348,349,BYD,Dolphin Mini,,38.0
+349,350,BYD,Song Plus DM-i (PHEV),,18.3
+350,351,BYD,Dolphin,,44.9
+351,352,BYD,Dolphin,,44.9
+352,353,BYD,Dolphin Mini,,38.0
+353,354,Renault,Kwid E-Tech,,26.8
+354,355,BYD,Dolphin Mini,,38.0
+355,356,BYD,Dolphin,,44.9
+356,357,BYD,Song Plus DM-i (PHEV),,18.3
+357,358,Volvo,EX30,,51.0
+358,359,GWM,Ora 03,,48.0
+359,360,BYD,Seal,,82.5
+360,361,BYD,Dolphin Mini,,38.0
+361,362,BYD,Dolphin,,44.9
+362,363,BYD,Dolphin,,44.9
+363,364,BYD,Dolphin Mini,,38.0
+364,365,BYD,Seal,,82.5
+365,366,Renault,Kwid E-Tech,,26.8
+366,367,Peugeot,e-2008,,50.0
+367,368,BYD,Dolphin Mini,,38.0
+368,369,BYD,Song Plus DM-i (PHEV),,18.3
+369,370,BYD,Dolphin Mini,,38.0
+370,371,BYD,Dolphin,,44.9
+371,372,Volvo,EX30,,51.0
+372,373,BYD,Dolphin Mini,,38.0
+373,374,BYD,Yuan Pro,,45.1
+374,375,BYD,Seal,,82.5
+375,376,GWM,Haval H6 PHEV,,34.0
+376,377,Chevrolet,Bolt EUV,,65.0
+377,378,GWM,Ora 03,,48.0
+378,379,BYD,Dolphin,,44.9
+379,380,BYD,Seal,,82.5
+380,381,BMW,iX1,,64.7
+381,382,BYD,Dolphin,,44.9
+382,383,BYD,Dolphin,,44.9
+383,384,BYD,Yuan Pro,,45.1
+384,385,BYD,Dolphin,,44.9
+385,386,BYD,Dolphin,,44.9
+386,387,Renault,Kwid E-Tech,,26.8
+387,388,BYD,Dolphin,,44.9
+388,389,BYD,Dolphin,,44.9
+389,390,BYD,Dolphin Mini,,38.0
+390,391,BYD,Yuan Pro,,45.1
+391,392,Renault,Kwid E-Tech,,26.8
+392,393,BYD,Seal,,82.5
+393,394,BYD,Dolphin Mini,,38.0
+394,395,BYD,Dolphin Mini,,38.0
+395,396,BYD,Dolphin Mini,,38.0
+396,397,BYD,Dolphin,,44.9
+397,398,Peugeot,e-2008,,50.0
+398,399,Chevrolet,Bolt EUV,,65.0
+399,400,BYD,Dolphin Mini,,38.0
+400,401,BYD,Dolphin Mini,,38.0
+401,402,BYD,Dolphin Mini,,38.0
+402,403,Peugeot,e-2008,,50.0
+403,404,BYD,Dolphin Mini,,38.0
+404,405,GWM,Ora 03,,48.0
+405,406,BYD,Song Plus DM-i (PHEV),,18.3
+406,407,BYD,Dolphin Mini,,38.0
+407,408,BYD,Yuan Pro,,45.1
+408,409,BYD,Dolphin Mini,,38.0
+409,410,Chevrolet,Bolt EUV,,65.0
+410,411,Chevrolet,Bolt EUV,,65.0
+411,412,Renault,Kwid E-Tech,,26.8
+412,413,BYD,Song Plus DM-i (PHEV),,18.3
+413,414,BYD,Dolphin Mini,,38.0
+414,415,BYD,Yuan Pro,,45.1
+415,416,BYD,Dolphin Mini,,38.0
+416,417,BMW,iX1,,64.7
+417,418,GWM,Haval H6 PHEV,,34.0
+418,419,GWM,Haval H6 PHEV,,34.0
+419,420,BYD,Yuan Pro,,45.1
+420,421,BYD,Dolphin Mini,,38.0
+421,422,BYD,Song Plus DM-i (PHEV),,18.3
+422,423,Renault,Kwid E-Tech,,26.8
+423,424,GWM,Ora 03,,48.0
+424,425,BYD,Seal,,82.5
+425,426,Chevrolet,Bolt EUV,,65.0
+426,427,BYD,Dolphin Mini,,38.0
+427,428,BYD,Dolphin Mini,,38.0
+428,429,BYD,Dolphin Mini,,38.0
+429,430,BYD,Dolphin Mini,,38.0
+430,431,BYD,Dolphin,,44.9
+431,432,Peugeot,e-2008,,50.0
+432,433,BYD,Dolphin,,44.9
+433,434,BYD,Seal,,82.5
+434,435,BYD,Dolphin Mini,,38.0
+435,436,BYD,Dolphin Mini,,38.0
+436,437,BYD,Song Plus DM-i (PHEV),,18.3
+437,438,BYD,Song Plus DM-i (PHEV),,18.3
+438,439,BYD,Dolphin,,44.9
+439,440,BYD,Dolphin Mini,,38.0
+440,441,BYD,Dolphin,,44.9
+441,442,BYD,Song Plus DM-i (PHEV),,18.3
+442,443,Chevrolet,Bolt EUV,,65.0
+443,444,GWM,Haval H6 PHEV,,34.0
+444,445,Chevrolet,Bolt EUV,,65.0
+445,446,BYD,Seal,,82.5
+446,447,BYD,Song Plus DM-i (PHEV),,18.3
+447,448,BYD,Dolphin,,44.9
+448,449,BYD,Seal,,82.5
+449,450,BYD,Dolphin Mini,,38.0
+450,451,BYD,Dolphin,,44.9
+451,452,Renault,Kwid E-Tech,,26.8
+452,453,BYD,Dolphin Mini,,38.0
+453,454,BYD,Dolphin Mini,,38.0
+454,455,Volvo,EX30,,51.0
+455,456,GWM,Ora 03,,48.0
+456,457,BYD,Dolphin Mini,,38.0
+457,458,BYD,Dolphin,,44.9
+458,459,BYD,Song Plus DM-i (PHEV),,18.3
+459,460,BYD,Seal,,82.5
+460,461,Chevrolet,Bolt EUV,,65.0
+461,462,Renault,Kwid E-Tech,,26.8
+462,463,BYD,Dolphin Mini,,38.0
+463,464,BYD,Seal,,82.5
+464,465,GWM,Ora 03,,48.0
+465,466,Renault,Kwid E-Tech,,26.8
+466,467,BYD,Dolphin Mini,,38.0
+467,468,BYD,Dolphin,,44.9
+468,469,BYD,Song Plus DM-i (PHEV),,18.3
+469,470,BYD,Yuan Pro,,45.1
+470,471,Renault,Kwid E-Tech,,26.8
+471,472,BYD,Dolphin,,44.9
+472,473,BYD,Song Plus DM-i (PHEV),,18.3
+473,474,BYD,Dolphin Mini,,38.0
+474,475,BYD,Dolphin Mini,,38.0
+475,476,BYD,Song Plus DM-i (PHEV),,18.3
+476,477,GWM,Ora 03,,48.0
+477,478,BYD,Dolphin,,44.9
+478,479,Peugeot,e-2008,,50.0
+479,480,BYD,Dolphin Mini,,38.0
+480,481,Peugeot,e-2008,,50.0
+481,482,Volvo,EX30,,51.0
+482,483,Volvo,EX30,,51.0
+483,484,BYD,Dolphin Mini,,38.0
+484,485,BYD,Dolphin,,44.9
+485,486,BYD,Dolphin Mini,,38.0
+486,487,Volvo,EX30,,51.0
+487,488,BYD,Dolphin,,44.9
+488,489,BYD,Dolphin Mini,,38.0
+489,490,BYD,Dolphin,,44.9
+490,491,BYD,Dolphin Mini,,38.0
+491,492,GWM,Haval H6 PHEV,,34.0
+492,493,BYD,Seal,,82.5
+493,494,BYD,Dolphin Mini,,38.0
+494,495,BYD,Dolphin Mini,,38.0
+495,496,BMW,iX1,,64.7
+496,497,BMW,iX1,,64.7
+497,498,BYD,Dolphin,,44.9
+498,499,BMW,iX1,,64.7
+499,500,BYD,Dolphin Mini,,38.0
+500,501,BYD,Dolphin Mini,,38.0
+501,502,Volvo,EX30,,51.0
+502,503,Volvo,EX30,,51.0
+503,504,BYD,Dolphin,,44.9
+504,505,GWM,Ora 03,,48.0
+505,506,BYD,Seal,,82.5
+506,507,BYD,Dolphin Mini,,38.0
+507,508,BYD,Dolphin,,44.9
+508,509,BYD,Seal,,82.5
+509,510,BYD,Dolphin,,44.9
+510,511,BYD,Dolphin Mini,,38.0
+511,512,GWM,Ora 03,,48.0
+512,513,BYD,Yuan Pro,,45.1
+513,514,BYD,Seal,,82.5
+514,515,BYD,Seal,,82.5
+515,516,Peugeot,e-2008,,50.0
+516,517,BYD,Dolphin Mini,,38.0
+517,518,BYD,Dolphin Mini,,38.0
+518,519,BYD,Song Plus DM-i (PHEV),,18.3
+519,520,Volvo,EX30,,51.0
+520,521,BYD,Dolphin,,44.9
+521,522,BYD,Dolphin Mini,,38.0
+522,523,GWM,Haval H6 PHEV,,34.0
+523,524,BYD,Dolphin Mini,,38.0
+524,525,Volvo,EX30,,51.0
+525,526,Peugeot,e-2008,,50.0
+526,527,BYD,Song Plus DM-i (PHEV),,18.3
+527,528,BYD,Dolphin Mini,,38.0
+528,529,BYD,Dolphin,,44.9
+529,530,Volvo,EX30,,51.0
+530,531,BYD,Dolphin,,44.9
+531,532,Chevrolet,Bolt EUV,,65.0
+532,533,BYD,Dolphin Mini,,38.0
+533,534,Chevrolet,Bolt EUV,,65.0
+534,535,Volvo,EX30,,51.0
+535,536,BYD,Song Plus DM-i (PHEV),,18.3
+536,537,Volvo,EX30,,51.0
+537,538,Renault,Kwid E-Tech,,26.8
+538,539,GWM,Haval H6 PHEV,,34.0
+539,540,Renault,Kwid E-Tech,,26.8
+540,541,GWM,Ora 03,,48.0
+541,542,Volvo,EX30,,51.0
+542,543,BYD,Song Plus DM-i (PHEV),,18.3
+543,544,Chevrolet,Bolt EUV,,65.0
+544,545,BYD,Dolphin Mini,,38.0
+545,546,GWM,Ora 03,,48.0
+546,547,BYD,Dolphin Mini,,38.0
+547,548,BYD,Dolphin Mini,,38.0
+548,549,BYD,Dolphin,,44.9
+549,550,BYD,Yuan Pro,,45.1
+550,551,BYD,Dolphin Mini,,38.0
+551,552,Chevrolet,Bolt EUV,,65.0
+552,553,BYD,Dolphin,,44.9
+553,554,BYD,Dolphin,,44.9
+554,555,BYD,Dolphin,,44.9
+555,556,BYD,Dolphin,,44.9
+556,557,BYD,Dolphin Mini,,38.0
+557,558,BYD,Dolphin Mini,,38.0
+558,559,BYD,Dolphin Mini,,38.0
+559,560,BYD,Song Plus DM-i (PHEV),,18.3
+560,561,Peugeot,e-2008,,50.0
+561,562,BYD,Dolphin,,44.9
+562,563,BYD,Dolphin Mini,,38.0
+563,564,BYD,Dolphin,,44.9
+564,565,BYD,Yuan Pro,,45.1
+565,566,BYD,Song Plus DM-i (PHEV),,18.3
+566,567,BYD,Dolphin,,44.9
+567,568,Renault,Kwid E-Tech,,26.8
+568,569,BYD,Dolphin,,44.9
+569,570,BYD,Dolphin,,44.9
+570,571,Volvo,EX30,,51.0
+571,572,BYD,Dolphin Mini,,38.0
+572,573,BYD,Dolphin Mini,,38.0
+573,574,BYD,Dolphin,,44.9
+574,575,BYD,Seal,,82.5
+575,576,BYD,Yuan Pro,,45.1
+576,577,Renault,Kwid E-Tech,,26.8
+577,578,Chevrolet,Bolt EUV,,65.0
+578,579,BYD,Song Plus DM-i (PHEV),,18.3
+579,580,BYD,Dolphin Mini,,38.0
+580,581,BYD,Dolphin Mini,,38.0
+581,582,Renault,Kwid E-Tech,,26.8
+582,583,GWM,Ora 03,,48.0
+583,584,Renault,Kwid E-Tech,,26.8
+584,585,GWM,Ora 03,,48.0
+585,586,BYD,Dolphin,,44.9
+586,587,BYD,Song Plus DM-i (PHEV),,18.3
+587,588,Renault,Kwid E-Tech,,26.8
+588,589,BYD,Dolphin Mini,,38.0
+589,590,BMW,iX1,,64.7
+590,591,BYD,Dolphin Mini,,38.0
+591,592,BYD,Dolphin Mini,,38.0
+592,593,Peugeot,e-2008,,50.0
+593,594,BYD,Yuan Pro,,45.1
+594,595,BYD,Dolphin Mini,,38.0
+595,596,BYD,Dolphin,,44.9
+596,597,BYD,Dolphin Mini,,38.0
+597,598,BYD,Dolphin,,44.9
+598,599,BYD,Song Plus DM-i (PHEV),,18.3
+599,600,BYD,Yuan Pro,,45.1
+600,601,GWM,Haval H6 PHEV,,34.0
+601,602,Volvo,EX30,,51.0
+602,603,GWM,Ora 03,,48.0
+603,604,BYD,Dolphin Mini,,38.0
+604,605,GWM,Ora 03,,48.0
+605,606,BMW,iX1,,64.7
+606,607,BYD,Seal,,82.5
+607,608,BYD,Dolphin,,44.9
+608,609,BYD,Dolphin,,44.9
+609,610,Peugeot,e-2008,,50.0
+610,611,BYD,Dolphin,,44.9
+611,612,BYD,Dolphin,,44.9
+612,613,Peugeot,e-2008,,50.0
+613,614,BYD,Dolphin Mini,,38.0
+614,615,Chevrolet,Bolt EUV,,65.0
+615,616,Volvo,EX30,,51.0
+616,617,BYD,Dolphin,,44.9
+617,618,Renault,Kwid E-Tech,,26.8
+618,619,BYD,Seal,,82.5
+619,620,Renault,Kwid E-Tech,,26.8
+620,621,GWM,Ora 03,,48.0
+621,622,BYD,Song Plus DM-i (PHEV),,18.3
+622,623,Peugeot,e-2008,,50.0
+623,624,BYD,Song Plus DM-i (PHEV),,18.3
+624,625,BYD,Song Plus DM-i (PHEV),,18.3
+625,626,Renault,Kwid E-Tech,,26.8
+626,627,BYD,Dolphin Mini,,38.0
+627,628,BYD,Dolphin Mini,,38.0
+628,629,BYD,Song Plus DM-i (PHEV),,18.3
+629,630,Volvo,EX30,,51.0
+630,631,BYD,Dolphin,,44.9
+631,632,BYD,Dolphin Mini,,38.0
+632,633,BYD,Dolphin Mini,,38.0
+633,634,BYD,Dolphin,,44.9
+634,635,BYD,Dolphin Mini,,38.0
+635,636,GWM,Haval H6 PHEV,,34.0
+636,637,GWM,Ora 03,,48.0
+637,638,BYD,Dolphin,,44.9
+638,639,Peugeot,e-2008,,50.0
+639,640,BMW,iX1,,64.7
+640,641,BYD,Dolphin Mini,,38.0
+641,642,Peugeot,e-2008,,50.0
+642,643,BYD,Dolphin Mini,,38.0
+643,644,BYD,Dolphin Mini,,38.0
+644,645,BYD,Dolphin,,44.9
+645,646,BYD,Song Plus DM-i (PHEV),,18.3
+646,647,BYD,Dolphin Mini,,38.0
+647,648,Renault,Kwid E-Tech,,26.8
+648,649,BYD,Dolphin Mini,,38.0
+649,650,BYD,Dolphin Mini,,38.0
+650,651,Renault,Kwid E-Tech,,26.8
+651,652,GWM,Ora 03,,48.0
+652,653,BYD,Song Plus DM-i (PHEV),,18.3
+653,654,BYD,Dolphin Mini,,38.0
+654,655,BYD,Dolphin,,44.9
+655,656,BYD,Dolphin,,44.9
+656,657,BYD,Dolphin,,44.9
+657,658,BYD,Dolphin,,44.9
+658,659,GWM,Ora 03,,48.0
+659,660,BYD,Dolphin,,44.9
+660,661,Renault,Kwid E-Tech,,26.8
+661,662,GWM,Ora 03,,48.0
+662,663,BYD,Dolphin Mini,,38.0
+663,664,BYD,Dolphin Mini,,38.0
+664,665,BYD,Dolphin,,44.9
+665,666,BYD,Seal,,82.5
+666,667,BYD,Dolphin Mini,,38.0
+667,668,BYD,Dolphin Mini,,38.0
+668,669,Renault,Kwid E-Tech,,26.8
+669,670,Peugeot,e-2008,,50.0
+670,671,BYD,Dolphin,,44.9
+671,672,BYD,Song Plus DM-i (PHEV),,18.3
+672,673,BYD,Song Plus DM-i (PHEV),,18.3
+673,674,BYD,Dolphin Mini,,38.0
+674,675,BYD,Song Plus DM-i (PHEV),,18.3
+675,676,GWM,Ora 03,,48.0
+676,677,BMW,iX1,,64.7
+677,678,BYD,Dolphin,,44.9
+678,679,BYD,Dolphin Mini,,38.0
+679,680,BYD,Yuan Pro,,45.1
+680,681,BYD,Dolphin Mini,,38.0
+681,682,BYD,Dolphin,,44.9
+682,683,Chevrolet,Bolt EUV,,65.0
+683,684,BYD,Dolphin Mini,,38.0
+684,685,Renault,Kwid E-Tech,,26.8
+685,686,GWM,Haval H6 PHEV,,34.0
+686,687,BYD,Dolphin Mini,,38.0
+687,688,Volvo,EX30,,51.0
+688,689,Chevrolet,Bolt EUV,,65.0
+689,690,BYD,Seal,,82.5
+690,691,Chevrolet,Bolt EUV,,65.0
+691,692,Chevrolet,Bolt EUV,,65.0
+692,693,BYD,Song Plus DM-i (PHEV),,18.3
+693,694,Peugeot,e-2008,,50.0
+694,695,BYD,Dolphin Mini,,38.0
+695,696,BYD,Dolphin Mini,,38.0
+696,697,GWM,Ora 03,,48.0
+697,698,BYD,Dolphin Mini,,38.0
+698,699,BYD,Song Plus DM-i (PHEV),,18.3
+699,700,GWM,Haval H6 PHEV,,34.0
+700,701,BYD,Seal,,82.5
+701,702,BYD,Dolphin,,44.9
+702,703,BYD,Dolphin Mini,,38.0
+703,704,BYD,Dolphin Mini,,38.0
+704,705,BYD,Dolphin,,44.9
+705,706,Volvo,EX30,,51.0
+706,707,Renault,Kwid E-Tech,,26.8
+707,708,BYD,Dolphin Mini,,38.0
+708,709,BYD,Dolphin,,44.9
+709,710,BYD,Dolphin Mini,,38.0
+710,711,Peugeot,e-2008,,50.0
+711,712,BYD,Song Plus DM-i (PHEV),,18.3
+712,713,Renault,Kwid E-Tech,,26.8
+713,714,BYD,Dolphin Mini,,38.0
+714,715,BYD,Song Plus DM-i (PHEV),,18.3
+715,716,BYD,Yuan Pro,,45.1
+716,717,Volvo,EX30,,51.0
+717,718,Volvo,EX30,,51.0
+718,719,BYD,Dolphin Mini,,38.0
+719,720,BYD,Dolphin Mini,,38.0
+720,721,BYD,Song Plus DM-i (PHEV),,18.3
+721,722,BMW,iX1,,64.7
+722,723,BYD,Dolphin,,44.9
+723,724,BYD,Dolphin,,44.9
+724,725,BYD,Dolphin Mini,,38.0
+725,726,BYD,Yuan Pro,,45.1
+726,727,BYD,Dolphin,,44.9
+727,728,GWM,Ora 03,,48.0
+728,729,GWM,Ora 03,,48.0
+729,730,Renault,Kwid E-Tech,,26.8
+730,731,BYD,Dolphin,,44.9
+731,732,Renault,Kwid E-Tech,,26.8
+732,733,Renault,Kwid E-Tech,,26.8
+733,734,Volvo,EX30,,51.0
+734,735,BYD,Dolphin,,44.9
+735,736,BYD,Dolphin Mini,,38.0
+736,737,Volvo,EX30,,51.0
+737,738,BYD,Dolphin Mini,,38.0
+738,739,BYD,Song Plus DM-i (PHEV),,18.3
+739,740,Volvo,EX30,,51.0
+740,741,BYD,Dolphin,,44.9
+741,742,BYD,Dolphin Mini,,38.0
+742,743,Volvo,EX30,,51.0
+743,744,BYD,Dolphin,,44.9
+744,745,BYD,Dolphin Mini,,38.0
+745,746,Volvo,EX30,,51.0
+746,747,BYD,Dolphin Mini,,38.0
+747,748,BYD,Song Plus DM-i (PHEV),,18.3
+748,749,GWM,Ora 03,,48.0
+749,750,BYD,Dolphin,,44.9
+750,751,Volvo,EX30,,51.0
+751,752,BYD,Yuan Pro,,45.1
+752,753,BMW,iX1,,64.7
+753,754,BYD,Dolphin Mini,,38.0
+754,755,GWM,Ora 03,,48.0
+755,756,BYD,Dolphin,,44.9
+756,757,BYD,Dolphin Mini,,38.0
+757,758,Chevrolet,Bolt EUV,,65.0
+758,759,BYD,Dolphin,,44.9
+759,760,BYD,Dolphin Mini,,38.0
+760,761,BYD,Seal,,82.5
+761,762,BYD,Dolphin,,44.9
+762,763,BYD,Song Plus DM-i (PHEV),,18.3
+763,764,BYD,Dolphin,,44.9
+764,765,BMW,iX1,,64.7
+765,766,BYD,Dolphin Mini,,38.0
+766,767,BYD,Dolphin Mini,,38.0
+767,768,BYD,Dolphin Mini,,38.0
+768,769,Volvo,EX30,,51.0
+769,770,BMW,iX1,,64.7
+770,771,GWM,Haval H6 PHEV,,34.0
+771,772,BYD,Dolphin Mini,,38.0
+772,773,BYD,Song Plus DM-i (PHEV),,18.3
+773,774,BYD,Dolphin,,44.9
+774,775,BYD,Dolphin,,44.9
+775,776,BYD,Dolphin Mini,,38.0
+776,777,BYD,Dolphin Mini,,38.0
+777,778,BYD,Dolphin Mini,,38.0
+778,779,BYD,Dolphin,,44.9
+779,780,BYD,Song Plus DM-i (PHEV),,18.3
+780,781,BYD,Dolphin Mini,,38.0
+781,782,BYD,Yuan Pro,,45.1
+782,783,Renault,Kwid E-Tech,,26.8
+783,784,BMW,iX1,,64.7
+784,785,BYD,Dolphin Mini,,38.0
+785,786,Volvo,EX30,,51.0
+786,787,GWM,Ora 03,,48.0
+787,788,BYD,Dolphin Mini,,38.0
+788,789,BYD,Dolphin Mini,,38.0
+789,790,BYD,Yuan Pro,,45.1
+790,791,BYD,Song Plus DM-i (PHEV),,18.3
+791,792,BYD,Dolphin Mini,,38.0
+792,793,BYD,Song Plus DM-i (PHEV),,18.3
+793,794,BYD,Dolphin Mini,,38.0
+794,795,Volvo,EX30,,51.0
+795,796,Chevrolet,Bolt EUV,,65.0
+796,797,BYD,Dolphin,,44.9
+797,798,BYD,Dolphin Mini,,38.0
+798,799,Volvo,EX30,,51.0
+799,800,BYD,Dolphin Mini,,38.0
+800,801,BYD,Song Plus DM-i (PHEV),,18.3
+801,802,BYD,Yuan Pro,,45.1
+802,803,Renault,Kwid E-Tech,,26.8
+803,804,Volvo,EX30,,51.0
+804,805,BYD,Dolphin,,44.9
+805,806,BYD,Dolphin,,44.9
+806,807,GWM,Ora 03,,48.0
+807,808,BYD,Dolphin,,44.9
+808,809,BYD,Song Plus DM-i (PHEV),,18.3
+809,810,BYD,Yuan Pro,,45.1
+810,811,Chevrolet,Bolt EUV,,65.0
+811,812,Volvo,EX30,,51.0
+812,813,BYD,Song Plus DM-i (PHEV),,18.3
+813,814,BYD,Dolphin,,44.9
+814,815,BYD,Song Plus DM-i (PHEV),,18.3
+815,816,Volvo,EX30,,51.0
+816,817,BYD,Dolphin Mini,,38.0
+817,818,BYD,Dolphin Mini,,38.0
+818,819,BYD,Dolphin Mini,,38.0
+819,820,BYD,Dolphin,,44.9
+820,821,BYD,Dolphin Mini,,38.0
+821,822,BYD,Dolphin Mini,,38.0
+822,823,BYD,Dolphin Mini,,38.0
+823,824,GWM,Ora 03,,48.0
+824,825,Renault,Kwid E-Tech,,26.8
+825,826,BYD,Seal,,82.5
+826,827,Chevrolet,Bolt EUV,,65.0
+827,828,BYD,Dolphin,,44.9
+828,829,Volvo,EX30,,51.0
+829,830,BYD,Dolphin,,44.9
+830,831,Chevrolet,Bolt EUV,,65.0
+831,832,BYD,Dolphin Mini,,38.0
+832,833,BYD,Dolphin,,44.9
+833,834,BYD,Dolphin,,44.9
+834,835,BYD,Dolphin Mini,,38.0
+835,836,Peugeot,e-2008,,50.0
+836,837,Peugeot,e-2008,,50.0
+837,838,BYD,Song Plus DM-i (PHEV),,18.3
+838,839,BYD,Dolphin Mini,,38.0
+839,840,BYD,Dolphin Mini,,38.0
+840,841,BYD,Dolphin Mini,,38.0
+841,842,GWM,Ora 03,,48.0
+842,843,BYD,Dolphin,,44.9
+843,844,BYD,Song Plus DM-i (PHEV),,18.3
+844,845,GWM,Haval H6 PHEV,,34.0
+845,846,BYD,Dolphin,,44.9
+846,847,Renault,Kwid E-Tech,,26.8
+847,848,BYD,Dolphin,,44.9
+848,849,BYD,Seal,,82.5
+849,850,Chevrolet,Bolt EUV,,65.0
+850,851,BYD,Song Plus DM-i (PHEV),,18.3
+851,852,BYD,Dolphin Mini,,38.0
+852,853,BYD,Song Plus DM-i (PHEV),,18.3
+853,854,BYD,Dolphin Mini,,38.0
+854,855,Volvo,EX30,,51.0
+855,856,BYD,Song Plus DM-i (PHEV),,18.3
+856,857,Volvo,EX30,,51.0
+857,858,BYD,Song Plus DM-i (PHEV),,18.3
+858,859,Chevrolet,Bolt EUV,,65.0
+859,860,BYD,Song Plus DM-i (PHEV),,18.3
+860,861,BYD,Dolphin,,44.9
+861,862,Renault,Kwid E-Tech,,26.8
+862,863,BYD,Dolphin,,44.9
+863,864,BMW,iX1,,64.7
+864,865,BYD,Dolphin,,44.9
+865,866,BYD,Seal,,82.5
+866,867,BYD,Dolphin,,44.9
+867,868,BYD,Yuan Pro,,45.1
+868,869,Volvo,EX30,,51.0
+869,870,BYD,Dolphin,,44.9
+870,871,BYD,Dolphin Mini,,38.0
+871,872,BYD,Dolphin Mini,,38.0
+872,873,Renault,Kwid E-Tech,,26.8
+873,874,BYD,Dolphin Mini,,38.0
+874,875,BYD,Dolphin Mini,,38.0
+875,876,Renault,Kwid E-Tech,,26.8
+876,877,BYD,Dolphin,,44.9
+877,878,BYD,Dolphin,,44.9
+878,879,BYD,Dolphin,,44.9
+879,880,BYD,Song Plus DM-i (PHEV),,18.3
+880,881,BYD,Dolphin Mini,,38.0
+881,882,BYD,Yuan Pro,,45.1
+882,883,BYD,Dolphin,,44.9
+883,884,Volvo,EX30,,51.0
+884,885,BYD,Dolphin Mini,,38.0
+885,886,BYD,Dolphin,,44.9
+886,887,Renault,Kwid E-Tech,,26.8
+887,888,Renault,Kwid E-Tech,,26.8
+888,889,BYD,Dolphin Mini,,38.0
+889,890,BYD,Dolphin Mini,,38.0
+890,891,Renault,Kwid E-Tech,,26.8
+891,892,BYD,Dolphin Mini,,38.0
+892,893,GWM,Ora 03,,48.0
+893,894,BYD,Dolphin,,44.9
+894,895,Volvo,EX30,,51.0
+895,896,BYD,Dolphin Mini,,38.0
+896,897,BYD,Dolphin,,44.9
+897,898,BYD,Dolphin,,44.9
+898,899,GWM,Ora 03,,48.0
+899,900,BYD,Dolphin,,44.9
+900,901,BYD,Dolphin Mini,,38.0

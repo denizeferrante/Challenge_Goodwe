@@ -23,3 +23,18 @@ build/
 *.hex
 *.elf
 *.bin
+
+# Segredos (chaves da OpenAI e do Supabase) - nunca versionar
+.env
+.env.*
+!.env.example
+
+# App gerado com a chave anon do .env (uso local)
+app/dist/ChargeGrid-app-local.html
+
+# Supabase CLI (estado local)
+supabase/.temp/
+supabase/.branches/
+
+# Firmware: senha do Wi-Fi local da apresentacao (copie do wifi_local.example.h)
+demo-fisica/firmware/esp32-led-demo/wifi_local.h

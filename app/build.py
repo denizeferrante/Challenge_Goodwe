@@ -15,6 +15,13 @@ Gera dois arquivos, ambos versionados no repositorio:
                                URI). Abre com dois cliques, sem servidor, e e
                                o arquivo para enviar por e-mail ou pendrive.
 
+E, se o .env da raiz tiver SUPABASE_ANON_KEY, gera tambem (fora do Git):
+
+  dist/ChargeGrid-app-local.html -> igual ao anterior, mas com a chave anon no
+                               lugar de '<anon-key>', para o assistente IA e os
+                               pagamentos chamarem o Supabase de verdade. A chave
+                               fica so no .env; o repositorio nunca a recebe.
+
 Por que existe um build: o runtime do Claude Design (vendor/dc-runtime.js) le a
 logica do componente pelo textContent da tag <script data-dc-script>, ou seja,
 ela precisa estar embutida no HTML -- nao da para carregar src/app.js por src="".
@@ -49,7 +56,18 @@ def data_uri(caminho_rel):
 
 
 template = ler("src", "template.html").strip()
-app_js = ler("src", "app.js").rstrip()
+# A previsão de demanda (machine learning) entra antes da lógica do app:
+#   src/ml/previsao-dados.js  -> GERADO pelo notebook ../inteligencia/ChargeGrid_ML.ipynb (exportar_app.py)
+#   src/ml/previsao-motor.js  -> roda as árvores do modelo no navegador
+#   src/pagamento/gateway.js  -> cliente da API de pagamento (sandbox ou Edge Function)
+# O runtime avalia tudo num único new Function, então as constantes ML_DADOS e
+# MLPrev ficam visíveis para a class Component, como BRL e HW_URLS já ficavam.
+ML_JS = ["previsao-dados.js", "previsao-motor.js"]
+app_js = ("".join(ler("src", "ml", n).rstrip() + "\n\n" for n in ML_JS)
+          + ler("src", "pagamento", "gateway.js").rstrip() + "\n\n"
+          + ler("src", "ia", "snapshot.js").rstrip() + "\n\n"
+          + ler("src", "ia", "assistente.js").rstrip() + "\n\n"
+          + ler("src", "app.js").rstrip())
 fonts_css = ler("src", "styles", "fonts.css").strip()
 app_css = ler("src", "styles", "app.css").strip()
 props = json.loads(ler("src", "props.json"))
@@ -117,8 +135,9 @@ def inline_urls_css(css):
 fonts_inline = inline_urls_css(fonts_css)
 app_css_inline = inline_urls_css(app_css)
 
+# caminho sempre com "/" (no Windows os.path.join usaria "\\" e o template não casaria)
 IMAGENS = sorted(
-    os.path.join("assets/img", n) for n in os.listdir(os.path.join(BASE, "assets", "img"))
+    "assets/img/" + n for n in os.listdir(os.path.join(BASE, "assets", "img"))
 )
 
 def embutir_imagens(texto):
@@ -141,3 +160,25 @@ with open(os.path.join(BASE, "dist", "ChargeGrid-app.html"), "w", encoding="utf-
 
 print("index.html               %8.1f KB" % (len(multi.encode()) / 1024))
 print("dist/ChargeGrid-app.html %8.1f KB" % (len(unico.encode()) / 1024))
+
+
+def chave_anon():
+    """Le SUPABASE_ANON_KEY do .env da raiz do projeto (sem depender de pacotes)."""
+    env = os.path.join(BASE, "..", ".env")
+    if not os.path.exists(env):
+        return ""
+    for linha in open(env, encoding="utf-8-sig"):
+        nome, _, valor = linha.strip().partition("=")
+        if nome.strip() == "SUPABASE_ANON_KEY":
+            return valor.strip().strip("'\"")
+    return ""
+
+
+anon = chave_anon()
+if anon:
+    local = unico.replace("IA_ANON_KEY = '<anon-key>'", "IA_ANON_KEY = '%s'" % anon)
+    with open(os.path.join(BASE, "dist", "ChargeGrid-app-local.html"), "w", encoding="utf-8") as f:
+        f.write(local)
+    print("dist/ChargeGrid-app-local.html (com a chave anon do .env, fora do Git)")
+else:
+    print("sem SUPABASE_ANON_KEY no .env: IA e pagamentos reais so funcionam com ela")
