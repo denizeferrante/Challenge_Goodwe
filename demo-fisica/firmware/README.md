@@ -8,8 +8,14 @@ botão físico que simula o plugue sendo conectado ao carro.
 
 ```
 demo-fisica/firmware/esp32-led-demo/
-├── esp32-led-demo.ino    sketch principal
-└── web_content.h         o app inteiro embutido como string literal (~110 KB)
+├── esp32-led-demo.ino      sketch principal (cria a rede GoodWe-Demo e também entra
+│                           na rede do local, para o app v2 achar o carregador)
+├── web_content.h           o app v1 inteiro embutido como string literal (~110 KB)
+├── wifi_local.example.h    modelo das credenciais da rede local: copie para
+│                           wifi_local.h (fora do git) e preencha
+├── teste-led-onboard/      teste mínimo da placa (LED interno)
+├── teste-integracao-app/   teste da integração HTTP com o app
+└── wokwi-sim/              versão para o simulador Wokwi
 ```
 
 ## Montagem

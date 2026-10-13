@@ -5,6 +5,7 @@ a{color:#f5333f;text-decoration:none}a:hover{color:#d31e2c}
 @keyframes cgRingGlow{0%,100%{filter:brightness(1) saturate(1)}50%{filter:brightness(1.28) saturate(1.15)}}
 @keyframes cgSheet{from{transform:translateY(100%)}to{transform:translateY(0)}}
 @keyframes cgFade{from{opacity:0}to{opacity:1}}
+@keyframes cgSpin{to{transform:rotate(360deg)}}
 input[type=range]{accent-color:#f5333f;width:100%}
 *::-webkit-scrollbar{width:0;height:0}
 @media (max-width:760px){

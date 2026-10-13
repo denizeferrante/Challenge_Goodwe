@@ -1,6 +1,6 @@
 # ChargeGrid Intelligence
 
-**EV Challenge GoodWe + FIAP 2026 · Sprint 3 · EcovoltSquad**
+**EV Challenge GoodWe + FIAP 2026 · Sprint 4 · EcovoltSquad**
 
 ChargeGrid transforma o carregador residencial GoodWe HCA G2 em um posto de recarga
 compartilhada. Um aplicativo, dois papéis: o **motorista** encontra, pluga e paga; o
@@ -10,6 +10,23 @@ com 10% de cada transação e o anfitrião recebe 90%.
 Este repositório reúne o desenvolvimento do projeto até a Sprint 3: a demonstração
 física com ESP32, o protótipo navegável do aplicativo, o modelo de dados e o design
 system.
+
+## O que a Sprint 4 acrescenta
+
+A Sprint 4 parte do que a equipe entregou até a Sprint 3 (demonstração física com ESP32,
+app ChargeGrid, modelo de dados e design system, todos mantidos aqui) e acrescenta:
+
+- **Previsão de demanda com machine learning** (`inteligencia/`): base simulada GoodWe/OCPP,
+  notebook com Random Forest para galeria e eletroposto, classificador de demanda Alta e
+  K-Means; o modelo roda no app (`app/src/ml/`) e alimenta a tela Previsão e os alertas.
+- **Síndico Virtual e Assistente IA com LLM** (`supabase/functions/assistente/`): LangGraph +
+  OpenAI + RAG no pgvector, com ferramentas que consultam os números do modelo de ML,
+  memória por conversa e guardrails (continuação da Sprint 03 da matéria de IA).
+- **Pagamento integrado a API** (`supabase/functions/pagamentos/`): Pix com QR Code,
+  pré-autorização e captura parcial (Mercado Pago, em modo sandbox no protótipo).
+- **Simuladores de viabilidade e de vagas** com irradiação de São Paulo, eficiência
+  energética e regra do LPUOS para carport; contato com instaladores e parceiros GoodWe.
+- **Revisão de UI/UX** das telas de entrada, login, impacto, financeiro e mapa.
 
 ![Arquitetura da solução](docs/arquitetura-da-solucao.png)
 
@@ -22,6 +39,7 @@ system.
 | [`demo-fisica/`](demo-fisica/) | **v1** — ESP32 + a interface servida por ele | ✅ **Funcional** · congelada · é o que roda no hardware |
 | [`app/`](app/) | **v2** — protótipo navegável: 39 telas, 3 personas | 🔨 **Em desenvolvimento** · interface completa, sem back-end |
 | [`banco-de-dados/`](banco-de-dados/) | Modelo PostgreSQL / Supabase, 15 tabelas | 📐 **Modelado** · ainda não provisionado |
+| [`inteligencia/`](inteligencia/) | Base simulada (smart meter GoodWe + OCPP 1.6 + clima, com defeitos de telemetria), ETL e previsão de demanda com machine learning | 🧠 **Treinado** · roda dentro do app v2 |
 | [`design-system/`](design-system/) | Tokens, 9 componentes e regras de conteúdo | ✅ **Estável** |
 | [`docs/`](docs/) | Diagrama de arquitetura | — |
 

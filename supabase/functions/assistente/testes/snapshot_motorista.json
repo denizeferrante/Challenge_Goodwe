@@ -1,0 +1,55 @@
+{
+ "papel": "motorista",
+ "bateria_pct": 41,
+ "capacidade_kwh": 60,
+ "potencia_kw": 7,
+ "preco_casa_rs_kwh": 1.89,
+ "eletropostos": [
+  {
+   "nome": "Galeria Pátio Norte",
+   "distancia": "850 m",
+   "tempo_ate_la": "4 min",
+   "vagas_livres": 2,
+   "vagas": 3,
+   "status": "livre",
+   "tarifa_rs_kwh": 2.19
+  },
+  {
+   "nome": "Mini Shopping Aurora",
+   "distancia": "1,4 km",
+   "tempo_ate_la": "7 min",
+   "vagas_livres": 0,
+   "vagas": 2,
+   "status": "ocupado",
+   "tarifa_rs_kwh": 2.45
+  },
+  {
+   "nome": "Galeria Sete de Abril",
+   "distancia": "2,1 km",
+   "tempo_ate_la": "9 min",
+   "vagas_livres": 0,
+   "vagas": 2,
+   "status": "falha",
+   "tarifa_rs_kwh": 2.05
+  }
+ ],
+ "pagamento": {
+  "metodos": [
+   "Pix",
+   "cartão",
+   "créditos da carteira"
+  ],
+  "saldo_creditos_rs": 48.2,
+  "pre_autorizacao": "cartão reserva a estimativa e captura só os kWh entregues; Pix cobra a estimativa e estorna a sobra na hora",
+  "ociosidade": {
+   "tolerancia_min": 10,
+   "rs_por_min": 0.9
+  }
+ },
+ "historico_mes": {
+  "kwh": 125.7,
+  "gasto_eletropostos_rs": 55.44,
+  "recargas_eletroposto": 2,
+  "recargas_casa": 4
+ }
+}

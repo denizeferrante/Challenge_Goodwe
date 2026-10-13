@@ -1,0 +1,647 @@
+{
+ "papel": "sindico",
+ "galeria": "Galeria Pátio Norte",
+ "tarifas_rede": {
+  "ponta_rs_kwh": 1.5,
+  "fora_ponta_rs_kwh": 0.85,
+  "credito_exportacao_rs_kwh": 0.6,
+  "ponta": "17h-21h"
+ },
+ "regra_rateio": "Com a galeria aberta, até 80% do sol vai para o eletroposto; sobra de sol nunca é trocada por energia da rede.",
+ "previsao": [
+  {
+   "d": 0,
+   "quando": "Hoje · segunda 12/10",
+   "data": "2026-10-12",
+   "feriado": "Nossa Senhora Aparecida",
+   "data_comercial": "Dia das Crianças",
+   "horario_galeria": "12h-20h",
+   "horario_eletroposto": "12h-20h",
+   "eletroposto_kwh": 40,
+   "eletroposto_margem_kwh": 25,
+   "eletroposto_pico_h": 15,
+   "galeria_kwh": 250,
+   "galeria_margem_kwh": 25,
+   "galeria_pico_h": 14,
+   "energia": {
+    "necessaria_kwh": 290,
+    "solar_gerada_kwh": 314,
+    "solar_usada_kwh": 174,
+    "bateria_entregue_kwh": 26,
+    "rede_kwh": 90,
+    "rede_ponta_kwh": 33,
+    "exportada_kwh": 111,
+    "compra_madrugada_kwh": 0,
+    "bateria_cheia_as": "8h",
+    "custo_rede_rs": 32,
+    "solar_para_eletroposto_kwh": 25,
+    "solar_para_galeria_kwh": 149
+   },
+   "fatores_eletroposto": [
+    {
+     "fator": "Dia da semana",
+     "kwh": -16.2
+    },
+    {
+     "fator": "Clima",
+     "kwh": -8.5
+    },
+    {
+     "fator": "Feriado",
+     "kwh": -6.5
+    }
+   ],
+   "fatores_galeria": [
+    {
+     "fator": "Feriado",
+     "kwh": -123.2
+    },
+    {
+     "fator": "Temperatura",
+     "kwh": -119
+    }
+   ]
+  },
+  {
+   "d": 1,
+   "quando": "Amanhã · terça 13/10",
+   "data": "2026-10-13",
+   "feriado": null,
+   "data_comercial": null,
+   "horario_galeria": "10h-22h",
+   "horario_eletroposto": "10h-21h",
+   "eletroposto_kwh": 51,
+   "eletroposto_margem_kwh": 32,
+   "eletroposto_pico_h": 15,
+   "galeria_kwh": 448,
+   "galeria_margem_kwh": 45,
+   "galeria_pico_h": 13,
+   "energia": {
+    "necessaria_kwh": 500,
+    "solar_gerada_kwh": 331,
+    "solar_usada_kwh": 267,
+    "bateria_entregue_kwh": 26,
+    "rede_kwh": 206,
+    "rede_ponta_kwh": 102,
+    "exportada_kwh": 35,
+    "compra_madrugada_kwh": 0,
+    "bateria_cheia_as": "9h",
+    "custo_rede_rs": 221,
+    "solar_para_eletroposto_kwh": 34,
+    "solar_para_galeria_kwh": 234
+   },
+   "fatores_eletroposto": [
+    {
+     "fator": "Dia da semana",
+     "kwh": -16.1
+    },
+    {
+     "fator": "Clima",
+     "kwh": -2.3
+    }
+   ],
+   "fatores_galeria": []
+  },
+  {
+   "d": 2,
+   "quando": "quarta 14/10",
+   "data": "2026-10-14",
+   "feriado": null,
+   "data_comercial": null,
+   "horario_galeria": "10h-22h",
+   "horario_eletroposto": "10h-21h",
+   "eletroposto_kwh": 52,
+   "eletroposto_margem_kwh": 32,
+   "eletroposto_pico_h": 19,
+   "galeria_kwh": 468,
+   "galeria_margem_kwh": 46,
+   "galeria_pico_h": 12,
+   "energia": {
+    "necessaria_kwh": 520,
+    "solar_gerada_kwh": 322,
+    "solar_usada_kwh": 267,
+    "bateria_entregue_kwh": 26,
+    "rede_kwh": 228,
+    "rede_ponta_kwh": 108,
+    "exportada_kwh": 27,
+    "compra_madrugada_kwh": 0,
+    "bateria_cheia_as": "9h",
+    "custo_rede_rs": 247,
+    "solar_para_eletroposto_kwh": 33,
+    "solar_para_galeria_kwh": 234
+   },
+   "fatores_eletroposto": [
+    {
+     "fator": "Dia da semana",
+     "kwh": -10.5
+    },
+    {
+     "fator": "Clima",
+     "kwh": -6.3
+    }
+   ],
+   "fatores_galeria": [
+    {
+     "fator": "Temperatura",
+     "kwh": -14
+    }
+   ]
+  },
+  {
+   "d": 3,
+   "quando": "quinta 15/10",
+   "data": "2026-10-15",
+   "feriado": null,
+   "data_comercial": null,
+   "horario_galeria": "10h-22h",
+   "horario_eletroposto": "10h-21h",
+   "eletroposto_kwh": 54,
+   "eletroposto_margem_kwh": 34,
+   "eletroposto_pico_h": 16,
+   "galeria_kwh": 458,
+   "galeria_margem_kwh": 45,
+   "galeria_pico_h": 13,
+   "energia": {
+    "necessaria_kwh": 512,
+    "solar_gerada_kwh": 335,
+    "solar_usada_kwh": 274,
+    "bateria_entregue_kwh": 26,
+    "rede_kwh": 212,
+    "rede_ponta_kwh": 104,
+    "exportada_kwh": 32,
+    "compra_madrugada_kwh": 0,
+    "bateria_cheia_as": "9h",
+    "custo_rede_rs": 228,
+    "solar_para_eletroposto_kwh": 36,
+    "solar_para_galeria_kwh": 238
+   },
+   "fatores_eletroposto": [
+    {
+     "fator": "Dia da semana",
+     "kwh": -8.5
+    },
+    {
+     "fator": "Clima",
+     "kwh": -5.1
+    }
+   ],
+   "fatores_galeria": [
+    {
+     "fator": "Temperatura",
+     "kwh": -22.8
+    }
+   ]
+  },
+  {
+   "d": 4,
+   "quando": "sexta 16/10",
+   "data": "2026-10-16",
+   "feriado": null,
+   "data_comercial": null,
+   "horario_galeria": "10h-22h",
+   "horario_eletroposto": "10h-21h",
+   "eletroposto_kwh": 54,
+   "eletroposto_margem_kwh": 34,
+   "eletroposto_pico_h": 13,
+   "galeria_kwh": 399,
+   "galeria_margem_kwh": 40,
+   "galeria_pico_h": 13,
+   "energia": {
+    "necessaria_kwh": 453,
+    "solar_gerada_kwh": 170,
+    "solar_usada_kwh": 149,
+    "bateria_entregue_kwh": 18,
+    "rede_kwh": 285,
+    "rede_ponta_kwh": 99,
+    "exportada_kwh": 0,
+    "compra_madrugada_kwh": 0,
+    "bateria_cheia_as": null,
+    "custo_rede_rs": 307,
+    "solar_para_eletroposto_kwh": 30,
+    "solar_para_galeria_kwh": 119
+   },
+   "fatores_eletroposto": [
+    {
+     "fator": "Clima",
+     "kwh": -20.9
+    }
+   ],
+   "fatores_galeria": [
+    {
+     "fator": "Temperatura",
+     "kwh": -67.1
+    },
+    {
+     "fator": "Insolação",
+     "kwh": -15.9
+    },
+    {
+     "fator": "Dia da semana",
+     "kwh": 5.2
+    }
+   ]
+  },
+  {
+   "d": 5,
+   "quando": "sábado 17/10",
+   "data": "2026-10-17",
+   "feriado": null,
+   "data_comercial": null,
+   "horario_galeria": "10h-22h",
+   "horario_eletroposto": "10h-21h",
+   "eletroposto_kwh": 78,
+   "eletroposto_margem_kwh": 48,
+   "eletroposto_pico_h": 13,
+   "galeria_kwh": 403,
+   "galeria_margem_kwh": 40,
+   "galeria_pico_h": 12,
+   "energia": {
+    "necessaria_kwh": 482,
+    "solar_gerada_kwh": 185,
+    "solar_usada_kwh": 168,
+    "bateria_entregue_kwh": 15,
+    "rede_kwh": 298,
+    "rede_ponta_kwh": 113,
+    "exportada_kwh": 0,
+    "compra_madrugada_kwh": 0,
+    "bateria_cheia_as": null,
+    "custo_rede_rs": 327,
+    "solar_para_eletroposto_kwh": 43,
+    "solar_para_galeria_kwh": 125
+   },
+   "fatores_eletroposto": [
+    {
+     "fator": "Dia da semana",
+     "kwh": 22.8
+    },
+    {
+     "fator": "Clima",
+     "kwh": -5.9
+    }
+   ],
+   "fatores_galeria": [
+    {
+     "fator": "Temperatura",
+     "kwh": -78.7
+    },
+    {
+     "fator": "Insolação",
+     "kwh": -13.4
+    },
+    {
+     "fator": "Dia da semana",
+     "kwh": 12
+    }
+   ]
+  },
+  {
+   "d": 6,
+   "quando": "domingo 18/10",
+   "data": "2026-10-18",
+   "feriado": null,
+   "data_comercial": null,
+   "horario_galeria": "12h-20h",
+   "horario_eletroposto": "12h-20h",
+   "eletroposto_kwh": 85,
+   "eletroposto_margem_kwh": 53,
+   "eletroposto_pico_h": 15,
+   "galeria_kwh": 376,
+   "galeria_margem_kwh": 37,
+   "galeria_pico_h": 14,
+   "energia": {
+    "necessaria_kwh": 461,
+    "solar_gerada_kwh": 310,
+    "solar_usada_kwh": 209,
+    "bateria_entregue_kwh": 26,
+    "rede_kwh": 227,
+    "rede_ponta_kwh": 89,
+    "exportada_kwh": 73,
+    "compra_madrugada_kwh": 0,
+    "bateria_cheia_as": "8h",
+    "custo_rede_rs": 206,
+    "solar_para_eletroposto_kwh": 53,
+    "solar_para_galeria_kwh": 155
+   },
+   "fatores_eletroposto": [
+    {
+     "fator": "Dia da semana",
+     "kwh": 17.5
+    },
+    {
+     "fator": "Clima",
+     "kwh": 16.3
+    }
+   ],
+   "fatores_galeria": [
+    {
+     "fator": "Temperatura",
+     "kwh": -21.4
+    },
+    {
+     "fator": "Dia da semana",
+     "kwh": 6
+    }
+   ]
+  }
+ ],
+ "semana": {
+  "eletroposto_kwh": 414,
+  "galeria_kwh": 2802,
+  "margem_semana_rel": 0.208,
+  "pico_rede_kw": 30.6,
+  "pico_quando": "domingo 18/10 16h",
+  "pico_pct_teto": 63,
+  "teto_operacional_kw": 48.4
+ },
+ "alertas": [
+  {
+   "severidade": "atencao",
+   "titulo": "Demanda Alta prevista em 8 horas",
+   "quando": "Amanhã · terça 13/10 e mais 3",
+   "acao": "Entrar nessas horas com a bateria carregada e acompanhar o DLM; se o pico se confirmar, ele limita as vagas antes de chegar à demanda contratada."
+  },
+  {
+   "severidade": "info",
+   "titulo": "Feriado: Nossa Senhora Aparecida e Dia das Crianças",
+   "quando": "Hoje · segunda 12/10",
+   "acao": "Conferir a escala da equipe e o horário reduzido publicado no mapa."
+  },
+  {
+   "severidade": "info",
+   "titulo": "Load-shifting recomendado em 6 dias: economia de R$ 34",
+   "quando": "quarta 14/10 e mais 5",
+   "acao": "Puxar a recarga para o horário de sol (4 dias), carregar a bateria de madrugada (2 dias). O plano hora a hora está na Previsão de cada dia."
+  }
+ ],
+ "load_shifting": [
+  {
+   "quando": "Hoje · segunda 12/10",
+   "titulo": "Puxar a recarga dos carros para o horário de sol",
+   "kwh": 4,
+   "de": "ponta 17h–21h",
+   "para": "12h–15h",
+   "economia_rs": 3.7
+  },
+  {
+   "quando": "Amanhã · terça 13/10",
+   "titulo": "Puxar a recarga dos carros para o horário de sol",
+   "kwh": 7,
+   "de": "ponta 17h–21h",
+   "para": "10h–13h",
+   "economia_rs": 6.4
+  },
+  {
+   "quando": "quarta 14/10",
+   "titulo": "Puxar a recarga dos carros para o horário de sol",
+   "kwh": 8,
+   "de": "ponta 17h–21h",
+   "para": "10h–12h",
+   "economia_rs": 7.2
+  },
+  {
+   "quando": "quinta 15/10",
+   "titulo": "Puxar a recarga dos carros para o horário de sol",
+   "kwh": 8,
+   "de": "ponta 17h–21h",
+   "para": "10h–13h",
+   "economia_rs": 7.2
+  },
+  {
+   "quando": "sexta 16/10",
+   "titulo": "Carregar a bateria com a rede de madrugada",
+   "kwh": 8,
+   "de": "03h–06h",
+   "para": "ponta 17h–21h",
+   "economia_rs": 4
+  },
+  {
+   "quando": "sábado 17/10",
+   "titulo": "Carregar a bateria com a rede de madrugada",
+   "kwh": 12,
+   "de": "03h–06h",
+   "para": "ponta 17h–21h",
+   "economia_rs": 5.8
+  }
+ ],
+ "ampliacao_bateria": {
+  "recomendado": false,
+  "titulo": "Ampliar a bateria em 30 kWh",
+  "resumo": "retorno em 10,6 anos",
+  "texto": "Com 60 kWh a bateria guarda mais sol de manhã: a rede na ponta cairia de 33 para 8 kWh e a exportação de 111 para 83 kWh. Na semana prevista, economia média de R$ 19/dia (≈ R$ 7.060/ano) para um investimento de R$ 75.000. Retorno longo para a vida útil de uma bateria LFP (~10 anos). Passa a compensar (retorno em 8 anos) se o kWh instalado sair abaixo de R$ 1.883, ou com mais carga na ponta.",
+  "opcoes": [
+   {
+    "opcao": "+30 kWh",
+    "economia": "R$ 7.060/ano",
+    "investimento": "R$ 75.000",
+    "retorno": "10,6 anos"
+   },
+   {
+    "opcao": "+60 kWh",
+    "economia": "R$ 12.636/ano",
+    "investimento": "R$ 150.000",
+    "retorno": "11,9 anos"
+   },
+   {
+    "opcao": "+90 kWh",
+    "economia": "R$ 17.702/ano",
+    "investimento": "R$ 225.000",
+    "retorno": "12,7 anos"
+   }
+  ]
+ },
+ "historico": {
+  "periodo": "14/09 a 11/10, 28 dias medidos",
+  "eletroposto_horas_mais_carregamento": [
+   {
+    "hora": "14h",
+    "kwh_medio": 8
+   },
+   {
+    "hora": "13h",
+    "kwh_medio": 7.6
+   },
+   {
+    "hora": "15h",
+    "kwh_medio": 6
+   }
+  ],
+  "galeria_horas_mais_consumo": [
+   {
+    "hora": "13h",
+    "kwh_medio": 33.7
+   },
+   {
+    "hora": "12h",
+    "kwh_medio": 32.2
+   },
+   {
+    "hora": "14h",
+    "kwh_medio": 31.3
+   }
+  ],
+  "eletroposto_kwh_medio_por_hora": [
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   1.9,
+   3.9,
+   5.8,
+   7.6,
+   8,
+   6,
+   5.6,
+   5.8,
+   5.1,
+   4.7,
+   4.5,
+   2.3,
+   0.9,
+   0.2
+  ],
+  "ultimos_dias": [
+   {
+    "data": "2026-09-28",
+    "dia_semana": "segunda",
+    "eletroposto_kwh": 56,
+    "galeria_kwh": 417
+   },
+   {
+    "data": "2026-09-29",
+    "dia_semana": "terça",
+    "eletroposto_kwh": 58,
+    "galeria_kwh": 395
+   },
+   {
+    "data": "2026-09-30",
+    "dia_semana": "quarta",
+    "eletroposto_kwh": 37,
+    "galeria_kwh": 428
+   },
+   {
+    "data": "2026-10-01",
+    "dia_semana": "quinta",
+    "eletroposto_kwh": 55,
+    "galeria_kwh": 471
+   },
+   {
+    "data": "2026-10-02",
+    "dia_semana": "sexta",
+    "eletroposto_kwh": 82,
+    "galeria_kwh": 474
+   },
+   {
+    "data": "2026-10-03",
+    "dia_semana": "sábado",
+    "eletroposto_kwh": 58,
+    "galeria_kwh": 452
+   },
+   {
+    "data": "2026-10-04",
+    "dia_semana": "domingo",
+    "eletroposto_kwh": 71,
+    "galeria_kwh": 322
+   },
+   {
+    "data": "2026-10-05",
+    "dia_semana": "segunda",
+    "eletroposto_kwh": 33,
+    "galeria_kwh": 346
+   },
+   {
+    "data": "2026-10-06",
+    "dia_semana": "terça",
+    "eletroposto_kwh": 78,
+    "galeria_kwh": 388
+   },
+   {
+    "data": "2026-10-07",
+    "dia_semana": "quarta",
+    "eletroposto_kwh": 38,
+    "galeria_kwh": 494
+   },
+   {
+    "data": "2026-10-08",
+    "dia_semana": "quinta",
+    "eletroposto_kwh": 63,
+    "galeria_kwh": 443
+   },
+   {
+    "data": "2026-10-09",
+    "dia_semana": "sexta",
+    "eletroposto_kwh": 24,
+    "galeria_kwh": 428
+   },
+   {
+    "data": "2026-10-10",
+    "dia_semana": "sábado",
+    "eletroposto_kwh": 82,
+    "galeria_kwh": 465
+   },
+   {
+    "data": "2026-10-11",
+    "dia_semana": "domingo",
+    "eletroposto_kwh": 111,
+    "galeria_kwh": 374
+   }
+  ]
+ },
+ "hoje_ate_agora": {
+  "sessoes": 3,
+  "kwh_entregues": 22.1,
+  "faturado_rs": 48.4,
+  "vagas_carregando": 2,
+  "vagas_em_falha": [
+   "Vaga 03"
+  ]
+ },
+ "vagas": [
+  {
+   "vaga": "Vaga 01",
+   "status": "carregando",
+   "kw": 6.8,
+   "kwh_hoje": 12.4,
+   "erro": null
+  },
+  {
+   "vaga": "Vaga 02",
+   "status": "carregando",
+   "kw": 6.5,
+   "kwh_hoje": 6.6,
+   "erro": null
+  },
+  {
+   "vaga": "Vaga 03",
+   "status": "falha",
+   "kw": 0,
+   "kwh_hoje": 0,
+   "erro": "Erro 2091 · sem resposta Modbus há 12 min"
+  },
+  {
+   "vaga": "Vaga 04",
+   "status": "livre",
+   "kw": 0,
+   "kwh_hoje": 3.1,
+   "erro": null
+  }
+ ],
+ "tarifa": {
+  "base_rs_kwh": 2.49,
+  "fator_alfa": 1,
+  "horario_ponta_ativo": false,
+  "ceu": "solar moderado (0%)"
+ },
+ "faturamento": {
+  "hoje_bruto_rs": 48.4,
+  "mes_bruto_rs": 1258,
+  "taxa_plataforma": "10%",
+  "mes_repasse_rs": 1133,
+  "kwh_hoje": 22.1
+ }
+}

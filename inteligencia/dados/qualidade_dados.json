@@ -1,0 +1,29 @@
+{
+ "medidor_linhas_lidas": 185926,
+ "medidor_duplicadas_removidas": 556,
+ "medidor_espurias_removidas": 82,
+ "medidor_amostras_faltando": 1624,
+ "meter_values_lidos": 59044,
+ "meter_values_duplicados_removidos": 294,
+ "transacoes_sem_stop_fechadas_pelo_ultimo_meter_value": 13,
+ "meter_values_interpolados": 3855,
+ "horas_sem_cobertura_do_medidor": 149,
+ "clima_horas_preenchidas": 46,
+ "horas_total": 15576,
+ "horas_com_alvo_galeria": 15427,
+ "conferencia_com_gabarito": {
+  "galeria_kwh": {
+   "erro_medio_abs_kwh": 0.0019,
+   "erro_total_pct": 0.005
+  },
+  "ev_kwh": {
+   "erro_medio_abs_kwh": 0.0009,
+   "erro_total_pct": -0.044
+  },
+  "solar_kwh": {
+   "erro_medio_abs_kwh": 0.0013,
+   "erro_total_pct": -0.001
+  },
+  "vagas_operando_horas_iguais_pct": 99.56
+ }
+}
