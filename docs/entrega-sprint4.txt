@@ -1,0 +1,18 @@
+EV Challenge GoodWe + FIAP 2026 - Sprint 4
+Projeto: ChargeGrid Intelligence
+Turma: CCPW
+Equipe: 4 - Ecovolts
+
+Integrantes (RM - nome - papel):
+572899 - Patrick Fernandes Martins Pais - Scrum Master
+571836 - Bruna Yukimy Hada - Desenvolvedora
+571562 - Denize Ferrante - Desenvolvedora e Product Owner
+570436 - Gabriel Del Pizzo Pintor - Desenvolvedor
+572395 - Gabriel Dias Menezes - Desenvolvedor
+570540 - Ian Rodrigues Martins - Desenvolvedor
+
+Video tecnico (YouTube, nao listado):
+<link do video>
+
+Repositorio GitHub:
+https://github.com/denizeferrante/Challenge_Goodwe

@@ -53,8 +53,11 @@ o carregador aceita uso, e o atendimento é por ordem de chegada.
 
 ## Estado
 
-Modelado e revisado, **ainda não provisionado**. O protótipo em `app/` não acessa banco
-nenhum — o estado vive em memória no navegador.
+Modelado e revisado. O `schema.sql` desta pasta e o `diagrama-er-supabase.mermaid` são a
+referência do ER. A base simulada de `../inteligencia/dados/supabase/` segue as colunas do
+mermaid e foi importada com sucesso num PostgreSQL 16 local (chaves estrangeiras, enum e
+`check`s respeitados; ver `../inteligencia/supabase/er_minimo_para_teste.sql`).
 
-O script `schema.sql` em PostgreSQL que acompanha este diagrama existe no material da
-sprint e ainda não foi trazido para este repositório.
+No Supabase já estão as migrations da IA e dos pagamentos (`../supabase/migrations/`).
+As 15 tabelas do ER ainda não foram migradas para lá, e o app ainda não lê nem grava
+nelas.

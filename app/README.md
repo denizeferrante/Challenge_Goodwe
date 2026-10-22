@@ -1,11 +1,11 @@
 # Aplicativo ChargeGrid — v2
 
-> **Em desenvolvimento.** A versão que roda no hardware é a
-> [v1, em `../demo-fisica/`](../demo-fisica/). O porquê das duas está no
-> [README principal](../README.md#por-que-duas-versões-do-aplicativo).
+> A versão que roda no hardware é a [v1, em `../demo-fisica/`](../demo-fisica/).
+> A documentação final da Sprint 4 está no [README principal](../README.md).
 
-Protótipo navegável do ChargeGrid Intelligence: 39 telas, três personas (motorista,
-gestor com a solução instalada e gestor prospect), estado em memória, sem back-end.
+Protótipo navegável do ChargeGrid Intelligence: três personas (motorista, gestor com a
+solução instalada e gestor prospect). O estado das telas vive em memória; Assistente IA
+e pagamento chamam as Edge Functions do Supabase (`../supabase/functions/`).
 
 Foi construído no **Claude Design**, que gera uma página única de ~5 MB. Aqui ela está
 desmontada em fontes legíveis e remontada por um script de build.
@@ -104,8 +104,9 @@ A integração com o ESP32 não foi alterada.
 
 ## Limitações
 
-- Nenhuma chamada de rede além dos 4 `<iframe>` de mapa do Google. Não há Supabase,
-  não há API, não há persistência: recarregar a página zera o estado.
+- Além dos `<iframe>` de mapa do Google, só o Assistente IA e o pagamento chamam a rede
+  (Edge Functions do Supabase). Não há persistência das telas: recarregar a página zera
+  o estado.
 - **Pagamento** passa por `src/pagamento/gateway.js`. Com a prop `pagamentoModo = sandbox`
   (padrão) as respostas da API do Mercado Pago são simuladas no navegador: Pix com QR Code e
   confirmação em ~4 s, cartão com pré-autorização e captura parcial, créditos com reserva.
@@ -114,8 +115,9 @@ A integração com o ESP32 não foi alterada.
   (padrão) respondem com as regras locais; com `api`, chamam a Edge Function
   `../supabase/functions/assistente` (LangGraph + OpenAI + RAG no pgvector), mandando junto o
   snapshot de `src/ia/snapshot.js` com os números do modelo de ML. Se a API falhar, voltam às regras locais.
-- **Não conversa com o ESP32.** Religar ao hardware passa pelo Supabase, conforme a
-  arquitetura alvo. Hoje quem fala com o equipamento é `../demo-fisica/app-v1/`.
+- **Conversa com o ESP32 por HTTP direto** na rede local (`hwFind`, `hwPoll` em
+  `/button` a cada 400 ms e `hwSet` em `/led`). Na arquitetura alvo essa ligação passa
+  pelo Supabase.
 - Tarifação dinâmica, DLM e load shifting rodam no cliente com dados sintéticos.
 - A previsão usa a base simulada de `../inteligencia/` e a previsão do tempo
   emitida em 11/10/2026: os dias previstos são 12 a 18/10/2026.
