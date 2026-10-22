@@ -1,7 +1,7 @@
 # Rastreabilidade dos requisitos — Sprint 4
 
 Cruza cada requisito do documento **Mapeamento de Requisitos conforme Nano Engenharia de
-Software** com o que existe no repositório ao fim da Sprint 4.
+Software** ([`docs/requisitos/`](requisitos/Mapeamento-de-Requisitos-Nano-Engenharia-de-Software.docx)) com o que existe no repositório ao fim da Sprint 4.
 
 **Legenda:** ✅ atendido · 🟡 parcial (o porquê está na coluna de evidência) · ⏳ não atendido
 

@@ -15,6 +15,7 @@
 | 🧠 **Notebook de machine learning** | [`inteligencia/ChargeGrid_ML.ipynb`](inteligencia/ChargeGrid_ML.ipynb) |
 | 🤖 **Síndico Virtual (LLM + RAG)** | [`supabase/functions/assistente/`](supabase/functions/assistente/) |
 | 💳 **Pagamento integrado (Pix e cartão)** | [`supabase/functions/pagamentos/`](supabase/functions/pagamentos/) |
+| 📄 **Documento de requisitos (Nano Engenharia de Software)** | [`docs/requisitos/Mapeamento-de-Requisitos-Nano-Engenharia-de-Software.docx`](docs/requisitos/Mapeamento-de-Requisitos-Nano-Engenharia-de-Software.docx) |
 | 📋 **Rastreabilidade dos requisitos** | [`docs/rastreabilidade-requisitos.md`](docs/rastreabilidade-requisitos.md) |
 | 🎬 **Roteiro do vídeo** | [`docs/roteiro-video.md`](docs/roteiro-video.md) |
 | 🖥️ **Apresentação da Sprint 4 (16:9)** | [`docs/ChargeGrid-Sprint4.pptx`](docs/ChargeGrid-Sprint4.pptx) |
@@ -57,7 +58,7 @@
 A GoodWe pediu uma solução que leve a linha residencial HCA G2 para o setor comercial
 com **otimização em tempo real, controle de demanda e tarifação dinâmica**, apoiada em
 dados estruturados e com a **IA como motor lógico** — não como enfeite de interface.
-No mapeamento de requisitos (Nano Engenharia de Software) isso virou quatro pilares:
+No [mapeamento de requisitos (Nano Engenharia de Software)](docs/requisitos/Mapeamento-de-Requisitos-Nano-Engenharia-de-Software.docx) isso virou quatro pilares:
 
 | Pilar do desafio | O problema real | Resposta do ChargeGrid |
 |---|---|---|
