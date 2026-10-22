@@ -10,7 +10,7 @@
 
 | | |
 |---|---|
-| 🎥 **Vídeo técnico (até 5 min)** | `<link do YouTube não listado>` |
+| 🎥 **Vídeo técnico (até 5 min)** | `<https://youtu.be/xEPaMF9ddMg>` |
 | 📱 **App (abre sem instalar nada)** | [`app/dist/ChargeGrid-app.html`](app/dist/ChargeGrid-app.html) |
 | 🧠 **Notebook de machine learning** | [`inteligencia/ChargeGrid_ML.ipynb`](inteligencia/ChargeGrid_ML.ipynb) |
 | 🤖 **Síndico Virtual (LLM + RAG)** | [`supabase/functions/assistente/`](supabase/functions/assistente/) |
