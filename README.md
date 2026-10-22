@@ -168,7 +168,6 @@ Separar o que roda do que é arquitetura alvo é parte da avaliação honesta da
 | Síndico Virtual e Assistente IA | ✅ Edge Function com LangGraph + OpenAI + RAG (pgvector), 12 testes offline; no app, fallback para regras locais se a API cair | [`supabase/functions/assistente/`](supabase/functions/assistente/) |
 | Pagamento (Pix, cartão, créditos) | ✅ Edge Function com Mercado Pago **sandbox**: pré-autorização, captura parcial, estorno e split 90/10 | [`supabase/functions/pagamentos/`](supabase/functions/pagamentos/) |
 | Banco Supabase | 🟡 Migrations da IA e dos pagamentos prontas; ER de 15 tabelas modelado e testado em PostgreSQL 16 local com a base simulada; Realtime ainda não ligado ao app | [`supabase/migrations/`](supabase/migrations/), [`banco-de-dados/`](banco-de-dados/) |
-| DLM, fator α e load shifting | 🟡 Lógica completa, mas executa no cliente; o preço do motorista e a potência da sessão ainda não usam α nem o DLM (ver 8.3) | [`app/src/app.js`](app/src/app.js) |
 | Ciclo físico botão → medição → LED | ✅ Funcional, por HTTP direto na rede local do ESP32, tanto na v1 quanto no app v2 | [`demo-fisica/`](demo-fisica/), `hwPoll`/`hwSet` em [`app/src/app.js`](app/src/app.js) |
 | Dados de medição | 🟡 **Base simulada** de 649 dias calibrada para São Paulo, com os defeitos de telemetria real | [`inteligencia/dados/`](inteligencia/dados/) |
 | API SEMS e gateway Modbus→OCPP | ⏳ Não implementados (dependem de acesso a uma planta real) | — |
